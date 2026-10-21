@@ -38,7 +38,7 @@ To start without a console window, use `pythonw run.py`.
 
 ### From a release
 
-`SidePeek.exe` is attached to each [release](https://github.com/markliu12/sidepeek/releases). No installation is required.
+`SidePeek.exe` is attached to each [release](https://github.com/markliu12/sidepeek/releases). No installation is required. Changes between versions are recorded in [CHANGELOG.md](CHANGELOG.md).
 
 ### Building the executable
 
