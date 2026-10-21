@@ -12,7 +12,7 @@ from .capture import WindowCapture
 from .config import Settings
 from .overlay import Overlay
 from .png import write_png
-from .watcher import Watcher, covers_monitor, describe
+from .watcher import Target, Watcher, covers_monitor, describe
 
 
 # --------------------------------------------------------------------------
@@ -93,6 +93,8 @@ class App:
         self.overlay.on_activate = self.activate_target
         self.overlay.on_toggle_pause = self.toggle_pause
         self.overlay.on_lock = self.lock_foreground
+        self.overlay.on_select_target = self.select_target
+        self.overlay.candidates_provider = self.watcher.candidates
 
         self._install_hook()
         self._register_hotkeys()
@@ -193,7 +195,22 @@ class App:
     def lock_foreground(self) -> None:
         target = self.watcher.lock_foreground()
         if target:
+            self.overlay.set_locked(target)
             print(f"[sidepeek] locked target: {target.display_name} ({target.exe})")
+        self.check()
+
+    def select_target(self, target: Target | None) -> None:
+        """Handle a choice from the "监视窗口" submenu.
+
+        ``None`` means "automatic", which is also how a pinned target is
+        released - there is no separate unlock action.
+        """
+        self.watcher.locked = target
+        self.overlay.set_locked(target)
+        if target is None:
+            print("[sidepeek] target: automatic")
+        else:
+            print(f"[sidepeek] target: {target.display_name} ({target.exe})")
         self.check()
 
     def quit(self) -> None:

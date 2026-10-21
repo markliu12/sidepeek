@@ -76,6 +76,8 @@ The thumbnail is displayed only when all of the following hold:
 
 A target window that has been destroyed is discarded from the internal state.
 
+A window chosen from the **监视窗口** menu is pinned in the same way as `Ctrl+Alt+L`, and choosing **自动** releases it.
+
 ### Fullscreen detection
 
 A window is treated as fullscreen when either of the following holds:
@@ -95,7 +97,8 @@ The width is the dimension the user controls. With `fit_aspect` enabled (the def
 
 SidePeek places an icon in the notification area for as long as it runs. It remains available while the thumbnail is hidden, which makes it the reliable way to reach the program when no console window is open.
 
-- **Right-click** opens a menu: return to the game window, pause or resume monitoring, and quit.
+- **Right-click** opens a menu: return to the game window, open the target list, pause or resume monitoring, and quit.
+- The **监视窗口** submenu lists every window that can be watched, largest first. Selecting one pins it, exactly like `Ctrl+Alt+L`; selecting **自动** releases the pin and returns to automatic detection. This is the intended way to switch between several running games: no hotkey to remember, and the list shows what is available.
 - **Double-click** pauses or resumes monitoring.
 - The tooltip reports the current state (`SidePeek — 监视中` or `SidePeek — 已暂停`).
 

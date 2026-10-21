@@ -3,10 +3,13 @@
 import unittest
 
 from sidepeek.config import Settings
+from sidepeek.watcher import Target
 from sidepeek.overlay import (
     TRAY_MENU_ACTIVATE,
     TRAY_MENU_QUIT,
     TRAY_MENU_TOGGLE,
+    MENU_TARGET_AUTO,
+    MENU_TARGET_BASE,
     Overlay,
     fitted_height,
     tray_tooltip,
@@ -107,6 +110,23 @@ class TrayTest(unittest.TestCase):
             overlay._on_tray_command(command)
 
         self.assertEqual(called, ["activate", "toggle", "quit"])
+
+    def test_target_menu_choice_reaches_the_callback(self):
+        overlay = make_overlay()
+        picked = []
+        overlay.on_select_target = picked.append
+        target = Target(4242, "Dota 2", "dota2.exe")
+        overlay._menu_choices = {MENU_TARGET_AUTO: None, MENU_TARGET_BASE: target}
+
+        overlay._on_tray_command(MENU_TARGET_BASE)
+        overlay._on_tray_command(MENU_TARGET_AUTO)
+
+        self.assertEqual(picked, [target, None])
+
+    def test_locked_target_is_reset_when_window_is_gone(self):
+        overlay = make_overlay()
+        overlay.set_locked(Target(1, "gone", "gone.exe"))
+        self.assertIsNotNone(overlay._locked_target)
 
     def test_unknown_command_is_ignored(self):
         overlay = make_overlay()

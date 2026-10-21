@@ -147,5 +147,48 @@ class DecisionTest(WatcherHarness):
         self.assertIsNone(watcher.last_game)
 
 
+class CandidatesTest(WatcherHarness):
+    """The list offered by the "监视窗口" menu."""
+
+    def test_auto_mode_lists_fullscreen_windows_sorted_by_area(self):
+        self.add_window(1, "cs2.exe", rect=(0, 0, 1920, 1080))
+        self.add_window(2, "dota2.exe", rect=(0, 0, 2560, 1600))
+        self.add_window(3, "notepad.exe", rect=(100, 100, 900, 700))
+
+        found = Watcher(Settings(targets=(), ignore=())).candidates()
+        self.assertEqual([t.exe for t in found], ["dota2.exe", "cs2.exe"])
+
+    def test_ignored_processes_never_appear(self):
+        self.add_window(1, "chrome.exe", rect=(0, 0, 1920, 1080))
+        self.add_window(2, "cs2.exe", rect=(0, 0, 1920, 1080))
+        found = Watcher(Settings(targets=(), ignore=("chrome.exe",))).candidates()
+        self.assertEqual([t.exe for t in found], ["cs2.exe"])
+
+    def test_allowlist_mode_ignores_size(self):
+        self.add_window(1, "cs2.exe", rect=(100, 100, 900, 700))
+        self.add_window(2, "dota2.exe", rect=(0, 0, 1920, 1080))
+        found = Watcher(Settings(targets=("cs2.exe",), ignore=())).candidates()
+        self.assertEqual([t.exe for t in found], ["cs2.exe"])
+
+    def test_same_process_and_title_collapses_to_the_largest_window(self):
+        self.add_window(1, "cs2.exe", rect=(0, 0, 800, 600))
+        self.add_window(2, "cs2.exe", rect=(0, 0, 1920, 1080))
+        self.titles[1] = self.titles[2] = "Counter-Strike 2"
+
+        found = Watcher(Settings(targets=(), ignore=())).candidates()
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0].hwnd, 2)
+
+    def test_minimised_windows_are_excluded(self):
+        self.add_window(1, "cs2.exe", rect=(0, 0, 1920, 1080), minimized=True)
+        self.assertEqual(Watcher(Settings(targets=(), ignore=())).candidates(), [])
+
+    def test_limit_is_respected(self):
+        for i in range(12):
+            self.add_window(i + 1, f"game{i}.exe", rect=(0, 0, 1920, 1080))
+        found = Watcher(Settings(targets=(), ignore=())).candidates()
+        self.assertEqual(len(found), 8)
+
+
 if __name__ == "__main__":
     unittest.main()
