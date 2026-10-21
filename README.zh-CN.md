@@ -1,5 +1,7 @@
 # SidePeek · 游戏后台小窗
 
+[![ci](https://github.com/markliu12/sidepeek/actions/workflows/ci.yml/badge.svg)](https://github.com/markliu12/sidepeek/actions/workflows/ci.yml)
+
 [English](README.md) · **简体中文**
 
 > 死了以后切出去刷点别的，别再反复按 Alt+Tab 看复活了没有。
@@ -198,7 +200,12 @@ flowchart LR
 
 ## 贡献
 
-Issue / PR 都欢迎。改代码前建议先跑一遍 `python run.py --self-test` 确认你的环境两条链路都通；提交前跑 `python -m compileall sidepeek`。
+Issue / PR 都欢迎。改代码前建议先跑一遍 `python run.py --self-test` 确认你的环境两条链路都通；提交前跑：
+
+```bash
+python -m compileall -q sidepeek run.py
+python -m unittest discover -s tests -t .    # 标准库 unittest，无需额外依赖
+```
 
 ## License
 
