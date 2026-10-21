@@ -13,6 +13,7 @@ a process list is what makes the tool usable with zero configuration.
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 
 from . import win32
@@ -41,8 +42,14 @@ def describe(hwnd: int) -> Target:
     return Target(hwnd, win32.window_title(hwnd), win32.process_name(hwnd))
 
 
-def covers_monitor(hwnd: int, threshold: float = 0.98, loose: float = 0.90) -> bool:
-    """True when the window should be treated as a fullscreen game.
+def covers_monitor_rect(
+    rect: tuple[int, int, int, int] | None,
+    monitor: tuple[int, int, int, int] | None,
+    maximized: bool = False,
+    threshold: float = 0.98,
+    loose: float = 0.90,
+) -> bool:
+    """Decide whether a window rectangle looks like a fullscreen game.
 
     Two rules, both comparing against the *monitor* rect rather than the work
     area:
@@ -54,28 +61,38 @@ def covers_monitor(hwnd: int, threshold: float = 0.98, loose: float = 0.90) -> b
       maximised window only fills the work area (~96%) and is exactly the
       case we want to ignore (browsers, editors, ...).
     """
-    rect = win32.frame_bounds(hwnd) or win32.window_rect(hwnd)
-    if not rect:
+    if not rect or not monitor:
         return False
     left, top, right, bottom = rect
-    width, height = right - left, bottom - top
-    ml, mt, mr, mb = win32.monitor_rect(hwnd)
+    ml, mt, mr, mb = monitor
     mon_w, mon_h = mr - ml, mb - mt
     if mon_w <= 0 or mon_h <= 0:
         return False
-    ratio_w, ratio_h = width / mon_w, height / mon_h
+    ratio_w = (right - left) / mon_w
+    ratio_h = (bottom - top) / mon_h
     if ratio_w >= threshold and ratio_h >= threshold:
         return True
-    return (not win32.is_maximized(hwnd)) and ratio_w >= loose and ratio_h >= loose
+    return (not maximized) and ratio_w >= loose and ratio_h >= loose
+
+
+def covers_monitor(hwnd: int, threshold: float = 0.98, loose: float = 0.90) -> bool:
+    rect = win32.frame_bounds(hwnd) or win32.window_rect(hwnd)
+    return covers_monitor_rect(
+        rect, win32.monitor_rect(hwnd), win32.is_maximized(hwnd), threshold, loose
+    )
 
 
 class Watcher:
+    #: how often a scan for an already-running game is allowed (seconds)
+    ADOPT_INTERVAL = 2.0
+
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         self.paused = False
         self.locked: Target | None = None
         self.last_game: Target | None = None
         self._foreground = 0
+        self._last_adopt = 0.0
 
     # -- public api --------------------------------------------------------
     def lock_foreground(self) -> Target | None:
@@ -133,7 +150,41 @@ class Watcher:
             return self.last_game
 
         candidate = self._maybe_remember(fg)
-        return candidate or self.last_game
+        return candidate or self.last_game or self._adopt_largest_fullscreen()
+
+    def _adopt_largest_fullscreen(self) -> Target | None:
+        """Find a game that was already running when SidePeek started.
+
+        Without this, launching the tool *after* tabbing out of the game does
+        nothing at all: nothing was ever focused to be remembered.
+        """
+        now = time.monotonic()
+        if now - self._last_adopt < self.ADOPT_INTERVAL:
+            return self.last_game
+        self._last_adopt = now
+        if not self.settings.auto_detect_fullscreen:
+            return None
+
+        best: Target | None = None
+        best_area = 0
+        for hwnd in win32.enum_windows():
+            if not win32.is_visible(hwnd):
+                continue
+            exe = win32.process_name(hwnd).lower()
+            if not exe or exe in self.settings.ignore:
+                continue
+            if not covers_monitor(hwnd):
+                continue
+            rect = win32.window_rect(hwnd)
+            if not rect:
+                continue
+            area = (rect[2] - rect[0]) * (rect[3] - rect[1])
+            if area > best_area:
+                best_area = area
+                best = describe(hwnd)
+        if best:
+            self.last_game = best
+        return best
 
     def _maybe_remember(self, hwnd: int) -> Target | None:
         """Remember ``hwnd`` as the game when it looks like one."""

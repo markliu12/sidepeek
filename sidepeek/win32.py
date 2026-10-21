@@ -207,6 +207,16 @@ class MONITORINFO(ctypes.Structure):
     ]
 
 
+class MINMAXINFO(ctypes.Structure):
+    _fields_ = [
+        ("ptReserved", wt.POINT),
+        ("ptMaxSize", wt.POINT),
+        ("ptMaxPosition", wt.POINT),
+        ("ptMinTrackSize", wt.POINT),
+        ("ptMaxTrackSize", wt.POINT),
+    ]
+
+
 class BITMAPINFOHEADER(ctypes.Structure):
     _fields_ = [
         ("biSize", wt.DWORD),
