@@ -1,0 +1,46 @@
+{
+  "peek": {
+    "width": 480,
+    "height": 270,
+    "backend": "auto",
+    "anchor": "bottom-right",
+    "margin": 24,
+    "pos": [
+      0,
+      0
+    ],
+    "padding": 6,
+    "opacity": 100,
+    "caption": true,
+    "click_to_focus": true,
+    "hide_when_minimized": true,
+    "hide_when_hovered": false,
+    "fps": 20,
+    "targets": [],
+    "auto_detect_fullscreen": true,
+    "ignore": [
+      "explorer.exe",
+      "python.exe",
+      "pythonw.exe",
+      "chrome.exe",
+      "msedge.exe",
+      "firefox.exe",
+      "code.exe",
+      "devenv.exe",
+      "windowsterminal.exe",
+      "powershell.exe",
+      "cmd.exe",
+      "textinputhost.exe",
+      "applicationframehost.exe",
+      "systemsettings.exe",
+      "searchhost.exe",
+      "shellexperiencehost.exe",
+      "startmenuexperiencehost.exe"
+    ],
+    "poll_ms": 300,
+    "hotkey_toggle": "ctrl+alt+g",
+    "hotkey_lock": "ctrl+alt+l",
+    "hotkey_quit": "ctrl+alt+q",
+    "show_in_taskbar": false
+  }
+}
