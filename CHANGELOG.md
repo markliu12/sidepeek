@@ -6,14 +6,7 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
-### Removed
-
-- The "clear current target" menu item, from both the notification area menu and the thumbnail
-  menu. It did not do what its label promised: clearing the remembered target was undone by
-  the automatic detection within one poll (~300 ms), which re-selected the same
-  monitor-filling window. The only visible effect was hiding the thumbnail. Pinning the window
-  you do want with `Ctrl+Alt+L` is the supported way to change targets; a session-scoped
-  "ignore this window" behaviour may replace the item later.
+## [0.3.0] - 2026-10-21
 
 ### Added
 
@@ -25,6 +18,15 @@ All notable changes to this project are documented in this file. The format foll
 - `fit_aspect` (enabled by default). The thumbnail height now follows the aspect ratio of the
   game instead of assuming 16:9, so 16:10, 21:9 and 4:3 titles fill the frame without black
   bars. The width remains the dimension the user controls.
+
+### Removed
+
+- The "clear current target" menu item, from both the notification area menu and the thumbnail
+  menu. It did not do what its label promised: clearing the remembered target was undone by
+  the automatic detection within one poll (~300 ms), which re-selected the same
+  monitor-filling window. The only visible effect was hiding the thumbnail. Pinning the window
+  you do want with `Ctrl+Alt+L` is the supported way to change targets; a session-scoped
+  "ignore this window" behaviour may replace the item later.
 
 ## [0.2.0] - 2026-10-21
 
@@ -72,6 +74,7 @@ All notable changes to this project are documented in this file. The format foll
 - Standalone Windows executable with an icon and a version resource.
 - Unit test suite and continuous integration on Python 3.9, 3.11 and 3.13.
 
-[Unreleased]: https://github.com/markliu12/sidepeek/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/markliu12/sidepeek/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/markliu12/sidepeek/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/markliu12/sidepeek/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/markliu12/sidepeek/releases/tag/v0.1.0
