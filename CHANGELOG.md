@@ -6,6 +6,12 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+### Added
+
+- `fit_aspect` (enabled by default). The thumbnail height now follows the aspect ratio of the
+  game instead of assuming 16:9, so 16:10, 21:9 and 4:3 titles fill the frame without black
+  bars. The width remains the dimension the user controls.
+
 ## [0.2.0] - 2026-10-21
 
 ### Added

@@ -31,6 +31,9 @@ DEFAULTS: dict = {
         "padding": 6,
         # 0-100, applied to the DWM thumbnail
         "opacity": 100,
+        # derive the height from the aspect ratio of the game so the picture
+        # fills the frame instead of being letterboxed
+        "fit_aspect": True,
         # show the caption strip with the process name and elapsed time
         "caption": True,
         # click the thumbnail to jump back into the game
@@ -85,6 +88,7 @@ class Settings:
     pos: tuple[int, int] = (0, 0)
     padding: int = 6
     opacity: int = 100
+    fit_aspect: bool = True
     caption: bool = True
     click_to_focus: bool = True
     hide_when_minimized: bool = True
@@ -149,6 +153,7 @@ def load(path: str | None = None) -> tuple[Settings, str]:
         pos=tuple(int(v) for v in (p.get("pos") or (0, 0)))[:2],  # type: ignore[arg-type]
         padding=max(0, int(p.get("padding", 6))),
         opacity=max(10, min(100, int(p.get("opacity", 100)))),
+        fit_aspect=bool(p.get("fit_aspect", True)),
         caption=bool(p.get("caption", True)),
         click_to_focus=bool(p.get("click_to_focus", True)),
         hide_when_minimized=bool(p.get("hide_when_minimized", True)),

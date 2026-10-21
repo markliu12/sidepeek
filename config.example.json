@@ -11,6 +11,7 @@
     ],
     "padding": 6,
     "opacity": 100,
+    "fit_aspect": true,
     "caption": true,
     "click_to_focus": true,
     "hide_when_minimized": true,

@@ -63,6 +63,27 @@ def tray_tooltip(paused: bool) -> str:
     return "SidePeek — 已暂停" if paused else "SidePeek — 监视中"
 
 
+def fitted_height(
+    width: int,
+    source_size: tuple[int, int],
+    padding: int,
+    caption_height: int,
+    minimum: int = MIN_HEIGHT,
+) -> int:
+    """Window height that shows ``source_size`` without leaving black bars.
+
+    The width is kept - it is the dimension the user chose - and the height is
+    derived from the aspect ratio of the game, so a 16:10 game, a 21:9 game and
+    a 4:3 game all fill the picture area exactly.
+    """
+    src_w, src_h = source_size
+    if src_w <= 0 or src_h <= 0:
+        return 0
+    inner_w = max(1, width - 2 * padding)
+    inner_h = max(1, round(inner_w * src_h / src_w))
+    return max(minimum, inner_h + 2 * padding + caption_height)
+
+
 def _signed_short(value: int) -> int:
     return ctypes.c_short(value & 0xFFFF).value
 
@@ -349,6 +370,7 @@ class Overlay:
         self._detach()
         self.target = target
         self._attach(target)
+        self._apply_source_aspect()
 
         if not self.visible:
             self._place()
@@ -402,6 +424,34 @@ class Overlay:
     # ------------------------------------------------------------------
     # renderer selection
     # ------------------------------------------------------------------
+    def _apply_source_aspect(self) -> None:
+        """Resize the height so the game fills the frame, keeping the width.
+
+        A fixed default cannot be right for every game: 16:9, 16:10, 21:9 and
+        4:3 all exist. The width is what the user chose, so it is preserved and
+        the height follows the source.
+        """
+        if not self.settings.fit_aspect or not self.hwnd:
+            return
+        target_h = fitted_height(
+            self._width, self.source_size, self.settings.padding,
+            self._caption_height(),
+        )
+        if not target_h:
+            return
+        _, top, _, bottom = win32.monitor_work_area(self.hwnd)
+        limit = bottom - top - 2 * self.settings.margin
+        target_h = max(MIN_HEIGHT, min(target_h, limit))
+        if abs(target_h - self._height) <= 2:
+            return
+
+        self._height = target_h
+        self.settings.height = target_h
+        user32.SetWindowPos(
+            self.hwnd, None, 0, 0, self._width, target_h,
+            win32.SWP_NOMOVE | win32.SWP_NOZORDER | win32.SWP_NOACTIVATE,
+        )
+
     def _attach(self, target: Target) -> None:
         backend = self.settings.backend
         if backend in ("auto", "dwm") and self._attach_dwm(target):
