@@ -24,6 +24,9 @@ jobs:
       - name: Byte-compile
         run: python -m compileall -q sidepeek run.py
 
+      - name: Unit tests
+        run: python -m unittest discover -s tests -t . -v
+
       - name: Import smoke test
         run: |
           python -c "import sidepeek; print('version', sidepeek.__version__)"

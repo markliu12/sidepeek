@@ -140,7 +140,15 @@ class Watcher:
     def _resolve_target(self, fg: int) -> Target | None:
         s = self.settings
 
-        if self.locked and win32.is_window(self.locked.hwnd):
+        # Drop state that points at a window which no longer exists. Games
+        # recreate their window on a resolution change, so a stale handle is
+        # not as unlikely as it sounds.
+        if self.last_game is not None and not win32.is_window(self.last_game.hwnd):
+            self.last_game = None
+        if self.locked is not None and not win32.is_window(self.locked.hwnd):
+            self.locked = None
+
+        if self.locked:
             return self.locked
 
         if s.targets:

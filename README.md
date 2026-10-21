@@ -1,5 +1,7 @@
 # SidePeek
 
+[![ci](https://github.com/markliu12/sidepeek/actions/workflows/ci.yml/badge.svg)](https://github.com/markliu12/sidepeek/actions/workflows/ci.yml)
+
 **English** · [简体中文](README.zh-CN.md)
 
 > Die, tab out, do something else — and still keep an eye on the respawn timer.
@@ -198,7 +200,12 @@ It only *reads the screen* — it never goes inside the game process. Most anti-
 
 ## Contributing
 
-Issues and PRs are welcome. Before changing code, run `python run.py --self-test` to confirm both backends work on your machine, and `python -m compileall sidepeek` before committing.
+Issues and PRs are welcome. Before changing code, run `python run.py --self-test` to confirm both backends work on your machine. Before committing:
+
+```bash
+python -m compileall -q sidepeek run.py
+python -m unittest discover -s tests -t .    # stdlib unittest, no extra deps
+```
 
 ## License
 
