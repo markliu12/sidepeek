@@ -139,8 +139,8 @@ def load(path: str | None = None) -> tuple[Settings, str]:
 
     p = data.get("peek", {})
     settings = Settings(
-        width=max(120, int(p.get("width", 480))),
-        height=max(70, int(p.get("height", 270))),
+        width=max(160, int(p.get("width", 480))),
+        height=max(90, int(p.get("height", 270))),
         backend=str(p.get("backend", "auto")).lower(),
         anchor=str(p.get("anchor", "bottom-right")).lower(),
         margin=int(p.get("margin", 24)),
@@ -164,8 +164,14 @@ def load(path: str | None = None) -> tuple[Settings, str]:
     return settings, path
 
 
-def save_runtime(path: str, settings: Settings) -> None:
-    """Persist the bits the user changes at runtime (size, position, anchor)."""
+def save_runtime(
+    path: str, settings: Settings, skip: tuple[str, ...] | frozenset[str] = ()
+) -> None:
+    """Persist the bits the user changes at runtime (size, position, anchor).
+
+    ``skip`` names fields that came from the command line for this run only.
+    Persisting those would silently make a one-off ``--width 800`` permanent.
+    """
     try:
         with open(path, "r", encoding="utf-8") as fh:
             data = json.load(fh)
@@ -173,10 +179,13 @@ def save_runtime(path: str, settings: Settings) -> None:
         data = copy.deepcopy(DEFAULTS)
 
     peek = data.setdefault("peek", {})
-    peek["width"] = settings.width
-    peek["height"] = settings.height
-    peek["anchor"] = settings.anchor
-    peek["pos"] = list(settings.pos)
+    if "width" not in skip:
+        peek["width"] = settings.width
+    if "height" not in skip:
+        peek["height"] = settings.height
+    if "anchor" not in skip:
+        peek["anchor"] = settings.anchor
+        peek["pos"] = list(settings.pos)
     try:
         with open(path, "w", encoding="utf-8") as fh:
             json.dump(data, fh, indent=2, ensure_ascii=False)

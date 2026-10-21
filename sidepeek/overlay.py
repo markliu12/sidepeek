@@ -32,6 +32,10 @@ from .win32 import H, gdi32, user32
 CLASS_NAME = "SidePeekOverlay"
 TIMER_FRAME = 1
 TIMER_POLL = 2
+TIMER_CAPTION = 3
+
+MIN_WIDTH = 160
+MIN_HEIGHT = 90
 
 COLOR_ACCENT = win32.rgb(0x4C, 0x8D, 0xFF)
 COLOR_BG = win32.rgb(0x0E, 0x11, 0x16)
@@ -195,6 +199,7 @@ class Overlay:
             self._shown_at = time.time()
             if self.mode == "capture":
                 self._start_frame_timer()
+            self._start_caption_timer()
 
         self._apply_layout()
         user32.InvalidateRect(self.hwnd, None, False)
@@ -203,6 +208,7 @@ class Overlay:
         if not self.visible:
             return
         self._stop_frame_timer()
+        self._stop_caption_timer()
         self._detach()
         user32.ShowWindow(self.hwnd, 0)
         self.visible = False
@@ -210,7 +216,8 @@ class Overlay:
 
     def destroy(self) -> None:
         if self.hwnd:
-            user32.KillTimer(self.hwnd, TIMER_FRAME)
+            for timer in (TIMER_FRAME, TIMER_POLL, TIMER_CAPTION):
+                user32.KillTimer(self.hwnd, timer)
             user32.DestroyWindow(self.hwnd)
             self.hwnd = 0
             self.visible = False
@@ -317,6 +324,15 @@ class Overlay:
 
     def _caption_height(self) -> int:
         return 22 if self.settings.caption else 0
+
+    def _caption_rect(self) -> tuple[int, int, int, int]:
+        pad = self.settings.padding
+        return (
+            pad,
+            self._height - pad - self._caption_height(),
+            self._width - pad,
+            self._height - pad,
+        )
 
     def _apply_layout(self) -> None:
         if self.mode == "dwm" and self.thumb is not None:
@@ -427,8 +443,8 @@ class Overlay:
             return
         w, h = self._width, self._height
         pad = self.settings.padding
-        top = h - pad - cap
-        self._fill(hdc, (pad, top, w - pad, h - pad), self._brush_bar)
+        left, top, right, bottom = self._caption_rect()
+        self._fill(hdc, (left, top, right, bottom), self._brush_bar)
 
         old_font = gdi32.SelectObject(hdc, self._font)
         try:
@@ -480,6 +496,27 @@ class Overlay:
         if self.capture.grab():
             self.source_size = (self.capture.width, self.capture.height)
         user32.InvalidateRect(self.hwnd, None, False)
+
+    def _start_caption_timer(self) -> None:
+        """Tick the "in background for 0:42" label.
+
+        This has to be independent of the capture timer: in DWM mode nothing
+        else ever repaints the window, so a shared timer would leave the
+        elapsed time frozen at 0:00.
+        """
+        if self.hwnd and self.settings.caption:
+            user32.SetTimer(self.hwnd, TIMER_CAPTION, 1000, None)
+
+    def _stop_caption_timer(self) -> None:
+        if self.hwnd:
+            user32.KillTimer(self.hwnd, TIMER_CAPTION)
+
+    def _on_caption_timer(self) -> None:
+        if not self.visible or not self.settings.caption:
+            return
+        # Only the strip is dirty, so the thumbnail area is never touched.
+        rect = win32.wt.RECT(*self._caption_rect())
+        user32.InvalidateRect(self.hwnd, ctypes.byref(rect), False)
 
     # ------------------------------------------------------------------
     # input handling
@@ -576,10 +613,15 @@ class Overlay:
         if msg == win32.WM_TIMER:
             if wparam == TIMER_FRAME:
                 self._on_frame_timer()
-                if self.settings.caption:
-                    user32.InvalidateRect(hwnd, None, False)
+            elif wparam == TIMER_CAPTION:
+                self._on_caption_timer()
             elif wparam == TIMER_POLL:
                 self.on_check()
+            return 0
+        if msg == win32.WM_GETMINMAXINFO:
+            info = ctypes.cast(lparam, ctypes.POINTER(win32.MINMAXINFO)).contents
+            info.ptMinTrackSize.x = MIN_WIDTH
+            info.ptMinTrackSize.y = MIN_HEIGHT
             return 0
         if msg == win32.WM_APP + 1:          # foreground changed
             self.on_check()
@@ -602,8 +644,8 @@ class Overlay:
             return 0
         if msg == win32.WM_SIZE:
             rect = win32.client_rect(hwnd)
-            self._width = max(1, rect[2] - rect[0])
-            self._height = max(1, rect[3] - rect[1])
+            self._width = max(MIN_WIDTH, rect[2] - rect[0])
+            self._height = max(MIN_HEIGHT, rect[3] - rect[1])
             self.settings.width = self._width
             self.settings.height = self._height
             if self.settings.anchor != "custom":

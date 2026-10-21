@@ -64,9 +64,15 @@ def visible_windows(settings: Settings | None = None) -> list[tuple[int, str, st
 # App
 # --------------------------------------------------------------------------
 class App:
-    def __init__(self, settings: Settings, config_path: str) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        config_path: str,
+        cli_overrides: frozenset[str] = frozenset(),
+    ) -> None:
         self.settings = settings
         self.config_path = config_path
+        self.cli_overrides = cli_overrides
         self.overlay = Overlay(settings, config_path)
         self.watcher = Watcher(settings)
         self._hook = None
@@ -104,7 +110,9 @@ class App:
         finally:
             self.overlay.destroy()
             self._teardown()
-            config_mod.save_runtime(self.config_path, self.settings)
+            config_mod.save_runtime(
+                self.config_path, self.settings, skip=self.cli_overrides
+            )
         return 0
 
     def _message_loop(self) -> None:
@@ -328,14 +336,21 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     settings, path = config_mod.load(args.config)
 
+    # Fields overridden on the command line are for this run only; they must
+    # not be written back to config.json on exit.
+    cli_overrides: set[str] = set()
     if args.backend:
         settings.backend = args.backend
+        cli_overrides.add("backend")
     if args.width:
         settings.width = args.width
+        cli_overrides.add("width")
     if args.height:
         settings.height = args.height
+        cli_overrides.add("height")
     if args.target:
         settings.targets = tuple(t.lower() for t in args.target)
+        cli_overrides.add("targets")
 
     if args.list:
         return do_list()
@@ -345,5 +360,5 @@ def main(argv: list[str] | None = None) -> int:
         hint = settings.targets[0] if settings.targets else ""
         return do_screenshot(settings, args.screenshot, hint)
 
-    app = App(settings, path)
+    app = App(settings, path, frozenset(cli_overrides))
     return app.run()
