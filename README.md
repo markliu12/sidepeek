@@ -4,6 +4,8 @@
 
 **English** · [简体中文](README.zh-CN.md)
 
+> **Stop alt-tabbing back while you wait to respawn — the picture stays in the corner.**
+
 SidePeek is a Windows desktop utility that displays a live thumbnail of a game window while that window is in the background, and removes the thumbnail when the game window regains focus.
 
 ---
