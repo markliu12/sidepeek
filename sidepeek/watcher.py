@@ -104,6 +104,40 @@ class Watcher:
         self.last_game = self.locked
         return self.locked
 
+    def candidates(self, limit: int = 8) -> list[Target]:
+        """Windows the user could pin as the peek target.
+
+        Follows the same rule as target resolution: with an allowlist only
+        matching processes qualify, otherwise anything that fills a monitor
+        and is not on the ignore list. Duplicates (same process and title) are
+        collapsed to the largest window.
+        """
+        s = self.settings
+        found: dict[tuple[str, str], tuple[int, Target]] = {}
+        for hwnd in win32.enum_windows():
+            if not win32.is_visible(hwnd) or win32.is_minimized(hwnd):
+                continue
+            exe = win32.process_name(hwnd).lower()
+            if not exe:
+                continue
+            if s.targets:
+                if exe not in s.targets:
+                    continue
+            else:
+                if exe in s.ignore or not s.auto_detect_fullscreen:
+                    continue
+                if not covers_monitor(hwnd):
+                    continue
+            rect = win32.window_rect(hwnd)
+            if not rect:
+                continue
+            area = (rect[2] - rect[0]) * (rect[3] - rect[1])
+            key = (exe, win32.window_title(hwnd))
+            if key not in found or area > found[key][0]:
+                found[key] = (area, describe(hwnd))
+        ordered = sorted(found.values(), key=lambda item: -item[0])
+        return [target for _, target in ordered][:limit]
+
     def evaluate(self, overlay_hwnd: int = 0) -> Decision:
         s = self.settings
         if self.paused:

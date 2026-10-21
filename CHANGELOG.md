@@ -17,6 +17,11 @@ All notable changes to this project are documented in this file. The format foll
 
 ### Added
 
+- **Target picker.** Both menus gained a `监视窗口` submenu listing every window that can be
+  watched, largest first, with the current target marked. Selecting one pins it; selecting
+  `自动` releases the pin and returns to automatic detection. This is the multi-game case:
+  choosing from a list instead of remembering which window `Ctrl+Alt+L` last pinned, and it
+  also supplies the "unlock" action that was missing after the clear-target removal.
 - `fit_aspect` (enabled by default). The thumbnail height now follows the aspect ratio of the
   game instead of assuming 16:9, so 16:10, 21:9 and 4:3 titles fill the frame without black
   bars. The width remains the dimension the user controls.

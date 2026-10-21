@@ -55,6 +55,10 @@ TRAY_MENU_ACTIVATE = 2001
 TRAY_MENU_TOGGLE = 2003
 TRAY_MENU_QUIT = 2004
 
+# target picker, shared by the notification area menu and the thumbnail menu
+MENU_TARGET_AUTO = 2100
+MENU_TARGET_BASE = 2101
+
 
 def tray_tooltip(paused: bool) -> str:
     """Text shown when the pointer rests on the notification area icon."""
@@ -124,6 +128,10 @@ class Overlay:
         self.on_activate = lambda: None
         self.on_toggle_pause = lambda: None
         self.on_lock = lambda: None
+        self.on_select_target = lambda target: None
+        self.candidates_provider = lambda: []
+        self._locked_target: Target | None = None
+        self._menu_choices: dict[int, Target | None] = {}
 
         self._width = settings.width
         self._height = settings.height
@@ -271,6 +279,46 @@ class Overlay:
     def tray_added(self) -> bool:
         return self._tray_added
 
+    def set_locked(self, target: Target | None) -> None:
+        """Remember which window is pinned, for the radio mark in the menu."""
+        self._locked_target = target
+
+    def _append_target_menu(self, parent) -> None:
+        """Append the "监视窗口" submenu listing watchable windows.
+
+        The first entry returns to automatic detection, which is also the way
+        out of a pinned target. ``_menu_choices`` maps the command ids back to
+        targets, since the menu is temporary and the ids only live while it is
+        open.
+        """
+        self._menu_choices = {MENU_TARGET_AUTO: None}
+        submenu = user32.CreatePopupMenu()
+        if not submenu:
+            return
+
+        locked = self._locked_target
+        if locked is not None and not win32.is_window(locked.hwnd):
+            self._locked_target = locked = None
+
+        auto_flags = win32.MF_STRING | (0 if locked else win32.MF_CHECKED)
+        user32.AppendMenuW(submenu, auto_flags, MENU_TARGET_AUTO, "自动（跟随前台）")
+
+        candidates = list(self.candidates_provider() or [])
+        if candidates:
+            user32.AppendMenuW(submenu, win32.MF_SEPARATOR, 0, None)
+        for index, target in enumerate(candidates):
+            command = MENU_TARGET_BASE + index
+            flags = win32.MF_STRING
+            if locked is not None and target.hwnd == locked.hwnd:
+                flags |= win32.MF_CHECKED
+            label = (target.display_name or target.exe).strip()
+            if len(label) > 40:
+                label = label[:39].rstrip() + "…"
+            user32.AppendMenuW(submenu, flags, command, label)
+            self._menu_choices[command] = target
+
+        user32.AppendMenuW(parent, win32.MF_POPUP, submenu, "监视窗口")
+
     def _on_tray_callback(self, event: int) -> None:
         if event in (win32.WM_RBUTTONUP, win32.WM_CONTEXTMENU):
             self._open_tray_menu()
@@ -286,6 +334,7 @@ class Overlay:
                 0 if self.target else win32.MF_GRAYED
             )
             user32.AppendMenuW(menu, activate_flags, TRAY_MENU_ACTIVATE, "回到游戏窗口")
+            self._append_target_menu(menu)
             user32.AppendMenuW(menu, win32.MF_SEPARATOR, 0, None)
             toggle_flags = win32.MF_STRING | (
                 win32.MF_CHECKED if self._paused else 0
@@ -316,6 +365,9 @@ class Overlay:
             self._on_tray_command(cmd)
 
     def _on_tray_command(self, cmd: int) -> None:
+        if cmd in self._menu_choices:
+            self.on_select_target(self._menu_choices[cmd])
+            return
         if cmd == TRAY_MENU_ACTIVATE:
             self.on_activate()
         elif cmd == TRAY_MENU_TOGGLE:
@@ -782,6 +834,7 @@ class Overlay:
             return
         try:
             user32.AppendMenuW(menu, win32.MF_STRING, MENU_ACTIVATE, "回到游戏窗口")
+            self._append_target_menu(menu)
             user32.AppendMenuW(menu, win32.MF_STRING, MENU_TOGGLE, "暂停 / 恢复监视")
             user32.AppendMenuW(menu, win32.MF_SEPARATOR, 0, None)
             user32.AppendMenuW(menu, win32.MF_STRING, MENU_QUIT, "退出 SidePeek")
@@ -797,7 +850,9 @@ class Overlay:
         finally:
             user32.DestroyMenu(menu)
 
-        if cmd == MENU_ACTIVATE:
+        if cmd in self._menu_choices:
+            self.on_select_target(self._menu_choices[cmd])
+        elif cmd == MENU_ACTIVATE:
             self.on_activate()
         elif cmd == MENU_TOGGLE:
             self.on_toggle_pause()
