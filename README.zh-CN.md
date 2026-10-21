@@ -38,7 +38,7 @@ python run.py
 
 ### 从发布版本获取
 
-`SidePeek.exe` 会随每个[发布版本](https://github.com/markliu12/sidepeek/releases)提供，无需安装。
+`SidePeek.exe` 会随每个[发布版本](https://github.com/markliu12/sidepeek/releases)提供，无需安装。各版本之间的变更记录见 [CHANGELOG.md](CHANGELOG.md)。
 
 ### 构建可执行文件
 
