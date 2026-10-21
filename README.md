@@ -281,7 +281,7 @@ Only one copy runs at a time. The copy that is already running shows a balloon p
 Open `%LOCALAPPDATA%\SidePeek\sidepeek.log`. Startup, target changes, hotkey conflicts, resume handling and unhandled exceptions are all recorded there.
 
 **How can SidePeek be started at login?**
-Right-click the notification-area icon and enable **开机自动启动**. This writes a per-user `Run` entry and needs no administrator rights. A shortcut in the directory opened by `shell:startup` works as well.
+Right-click the notification-area icon and enable **开机自动启动**. This is off by default and the program never writes the entry on its own. Enabling it stores a per-user `Run` value and needs no administrator rights; enabling and disabling are the same click. A shortcut in the directory opened by `shell:startup` works as well.
 
 ## Demonstration
 

@@ -6,6 +6,8 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-21
+
 ### Added
 
 - **Single instance.** A named mutex keeps a second copy from running: it would otherwise
@@ -19,7 +21,8 @@ All notable changes to this project are documented in this file. The format foll
   written there and shown in a message box; the windowed build used to fail silently.
 - **Run at login** in the notification area menu, backed by a per-user
   `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` entry, so no administrator rights
-  are involved.
+  are involved. Off by default: nothing is written to the registry until the entry is
+  clicked, and clicking it again removes the value.
 - **Fit to the picture** (`按画面比例自适应`) in both context menus. Dragging the resize
   handle now turns `fit_aspect` off — a size picked by hand must not be overridden the
   next time the thumbnail appears — which makes this entry the way back.
@@ -108,7 +111,8 @@ All notable changes to this project are documented in this file. The format foll
 - Standalone Windows executable with an icon and a version resource.
 - Unit test suite and continuous integration on Python 3.9, 3.11 and 3.13.
 
-[Unreleased]: https://github.com/markliu12/sidepeek/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/markliu12/sidepeek/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/markliu12/sidepeek/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/markliu12/sidepeek/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/markliu12/sidepeek/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/markliu12/sidepeek/releases/tag/v0.1.0
