@@ -1,0 +1,33 @@
+name: ci
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.11", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Byte-compile
+        run: python -m compileall -q sidepeek run.py
+
+      - name: Import smoke test
+        run: |
+          python -c "import sidepeek; print('version', sidepeek.__version__)"
+          python -c "from sidepeek.app import parse_hotkey; assert parse_hotkey('ctrl+alt+g') == (3, 0x47)"
+
+      - name: CLI help
+        run: python run.py --help

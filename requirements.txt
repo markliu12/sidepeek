@@ -1,0 +1,5 @@
+# GamePeek has no third-party dependencies.
+#
+# Everything it needs (user32 / gdi32 / dwmapi / kernel32) is reached through
+# the standard library's ctypes module, so `pip install -r requirements.txt`
+# has nothing to do. This file exists only to make that explicit.
