@@ -15,9 +15,11 @@ from dataclasses import dataclass
 
 DEFAULTS: dict = {
     "peek": {
-        # size of the floating window, in physical pixels
-        "width": 480,
-        "height": 270,
+        # Window size in physical pixels. The default leaves a 480x270 (16:9)
+        # picture area once padding (6 px) and the caption strip (22 px) are
+        # subtracted, so 16:9 games fill the thumbnail without black bars.
+        "width": 492,
+        "height": 304,
         # "auto" | "dwm" | "capture"
         "backend": "auto",
         # "top-left" | "top-right" | "bottom-left" | "bottom-right" | "custom"
@@ -75,8 +77,8 @@ DEFAULTS: dict = {
 
 @dataclass
 class Settings:
-    width: int = 480
-    height: int = 270
+    width: int = 492
+    height: int = 304
     backend: str = "auto"
     anchor: str = "bottom-right"
     margin: int = 24
@@ -139,8 +141,8 @@ def load(path: str | None = None) -> tuple[Settings, str]:
 
     p = data.get("peek", {})
     settings = Settings(
-        width=max(160, int(p.get("width", 480))),
-        height=max(90, int(p.get("height", 270))),
+        width=max(160, int(p.get("width", 492))),
+        height=max(90, int(p.get("height", 304))),
         backend=str(p.get("backend", "auto")).lower(),
         anchor=str(p.get("anchor", "bottom-right")).lower(),
         margin=int(p.get("margin", 24)),

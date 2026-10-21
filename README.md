@@ -87,6 +87,18 @@ Detection can be bypassed by specifying `peek.targets` or by locking a window wi
 
 The thumbnail is frameless, always on top, and never activated by the pointer. It can be dragged with the left mouse button and resized by dragging the lower-right corner; both the size and the position are written to `config.json` on exit. The minimum size is 160 × 90 pixels. A single click returns focus to the game window. A right-click opens a context menu.
 
+The default size of 492 × 304 leaves a 480 × 270 picture area once the 6 px padding and the 22 px caption strip are subtracted, so games rendered at 16:9 fill the thumbnail without letterboxing. Changing `width` and `height` without preserving that ratio reintroduces the bars.
+
+### Notification area
+
+SidePeek places an icon in the notification area for as long as it runs. It remains available while the thumbnail is hidden, which makes it the reliable way to reach the program when no console window is open.
+
+- **Right-click** opens a menu: return to the game window, clear the current target, pause or resume monitoring, and quit.
+- **Double-click** pauses or resumes monitoring.
+- The tooltip reports the current state (`SidePeek — 监视中` or `SidePeek — 已暂停`).
+
+If Explorer restarts, the icon is added again automatically.
+
 ## Command line
 
 ```bash
@@ -146,7 +158,7 @@ The configuration file is JSON. Missing keys fall back to the defaults; unknown 
 
 | Key | Default | Description |
 | --- | --- | --- |
-| `width`, `height` | `480`, `270` | Thumbnail dimensions in physical pixels. Minimum 160 × 90. |
+| `width`, `height` | `492`, `304` | Thumbnail window size in physical pixels, minimum 160 × 90. The default leaves a 480 × 270 (16:9) picture area once border padding and the caption strip are subtracted, so 16:9 games are shown without black bars. |
 | `backend` | `"auto"` | `auto`, `dwm` or `capture`. |
 | `anchor` | `"bottom-right"` | `top-left`, `top-right`, `bottom-left`, `bottom-right` or `custom`. |
 | `margin` | `24` | Distance from the monitor edge, in pixels. |
@@ -243,7 +255,7 @@ This repository does not currently include a demonstration recording. Contributi
 ## Roadmap
 
 - [ ] Recognize the respawn countdown from the thumbnail and signal when it expires
-- [ ] System tray icon
+- [x] System tray icon (right-click to quit)
 - [ ] Simultaneous monitoring of multiple games
 - [ ] Cheaper capture through DXGI Desktop Duplication
 - [ ] Automatic scaling of the thumbnail according to the monitor DPI
