@@ -93,16 +93,22 @@ The thumbnail is frameless, always on top, and never activated by the pointer. I
 
 The width is the dimension the user controls. With `fit_aspect` enabled (the default) the height is derived from the aspect ratio of the game, so 16:9, 16:10, 21:9 and 4:3 titles all fill the picture area without black bars; the starting height of 304 corresponds to 16:9 and is corrected the first time a game is shown. Disabling `fit_aspect` freezes the window shape, in which case the picture is letterboxed to fit.
 
+Dragging the resize handle disables `fit_aspect` automatically: a size chosen by hand must not be overridden the next time the thumbnail appears. The **按画面比例自适应** entry in either context menu turns it back on.
+
 ### Notification area
 
 SidePeek places an icon in the notification area for as long as it runs. It remains available while the thumbnail is hidden, which makes it the reliable way to reach the program when no console window is open.
 
-- **Right-click** opens a menu: return to the game window, open the target list, pause or resume monitoring, and quit.
+- **Right-click** opens a menu: return to the game window, open the target list, toggle the aspect fit, pause or resume monitoring, toggle run-at-login, and quit.
 - The **监视窗口** submenu lists every window that can be watched, largest first. Selecting one pins it, exactly like `Ctrl+Alt+L`; selecting **自动** releases the pin and returns to automatic detection. This is the intended way to switch between several running games: no hotkey to remember, and the list shows what is available.
 - **Double-click** pauses or resumes monitoring.
 - The tooltip reports the current state (`SidePeek — 监视中` or `SidePeek — 已暂停`).
 
 If Explorer restarts, the icon is added again automatically.
+
+### One instance at a time
+
+A named mutex stops a second copy from starting. Starting the program again does not open a second window and does not cost the first copy its hotkeys: the running copy shows a balloon pointing at its notification-area icon, and the new process exits with code 0. The command-line diagnostics are exempt, so `--list`, `--self-test` and `--screenshot` still work while the program is running.
 
 ## Command line
 
@@ -132,7 +138,7 @@ Values supplied with `--width`, `--height`, `--backend` and `--target` apply to 
 | `Ctrl+Alt+L` | Locks the foreground window as the target. |
 | `Ctrl+Alt+Q` | Terminates the program. |
 
-The combinations are configurable through `hotkey_toggle`, `hotkey_lock` and `hotkey_quit`. If a combination is already registered by another application, the program continues without that hotkey and reports the failure on the console.
+The combinations are configurable through `hotkey_toggle`, `hotkey_lock` and `hotkey_quit`. If a combination is already registered by another application, the program continues without that hotkey and says so in a notification-area balloon; the corresponding action stays available from the tray menu.
 
 ## Diagnostics
 
@@ -157,6 +163,16 @@ result: ready - at least one backend works on this machine
 
 The self-test is the recommended diagnostic step before reporting a defect.
 
+### Log file
+
+The packaged build runs without a console, so everything that would be printed there is also appended to:
+
+```
+%LOCALAPPDATA%\SidePeek\sidepeek.log
+```
+
+One previous generation is kept as `sidepeek.log.1` once the file passes 512 KB. Unhandled exceptions are written to the same file and shown in a message box, so a crash in the windowed build is no longer silent. Attach this file when reporting a problem.
+
 ## Configuration
 
 The configuration file is JSON. Missing keys fall back to the defaults; unknown keys are ignored.
@@ -171,7 +187,7 @@ The configuration file is JSON. Missing keys fall back to the defaults; unknown 
 | `padding` | `6` | Space between the border and the image. |
 | `opacity` | `100` | Image opacity, 10 to 100. Applies to the `dwm` backend. |
 | `caption` | `true` | Displays a footer with the process name and the elapsed time in background. |
-| `fit_aspect` | `true` | Derives the height from the aspect ratio of the game so the picture fills the frame. |
+| `fit_aspect` | `true` | Derives the height from the aspect ratio of the game so the picture fills the frame. Turned off automatically when the resize handle is used. |
 | `click_to_focus` | `true` | A single click returns focus to the game. |
 | `hide_when_minimized` | `true` | Hides the thumbnail while the game is minimized. |
 | `hide_when_hovered` | `false` | Hides the thumbnail while the pointer is over it. |
@@ -211,6 +227,9 @@ The implementation is divided into the following modules:
 | `config.py` | Configuration loading, merging and write-back. |
 | `app.py` | Message loop, global hotkeys, foreground event hook, diagnostics. |
 | `png.py` | Minimal PNG encoder used by the diagnostics only. |
+| `diag.py` | Log file and unhandled-exception handling. |
+| `instance.py` | Single-instance lock and the ping sent to a running copy. |
+| `autostart.py` | Run-at-login switch backed by the per-user `Run` entry. |
 
 ### Rendering backends
 
@@ -242,17 +261,23 @@ The test suite uses the standard library `unittest` module and requires no addit
 **The thumbnail does not appear after switching away from the game.**
 Run `python run.py --self-test`. If both backends report success, the target window was probably not recognized. Specify it with `--target` or with `peek.targets`, or press `Ctrl+Alt+L` while the game is focused.
 
-**The thumbnail is black or frozen.**
-The source window is likely in exclusive fullscreen mode, which the `dwm` backend cannot compose. Change the game to fullscreen windowed or borderless windowed mode.
+**The thumbnail is black or frozen, typically after the machine has been asleep.**
+Resuming from sleep is handled by rebuilding the thumbnail, so the frame should come back within a fraction of a second. If it does not, the source window is likely in exclusive fullscreen mode, which the `dwm` backend cannot compose. Change the game to fullscreen windowed or borderless windowed mode.
 
 **The image does not fill the thumbnail.**
-The image is scaled proportionally and letterboxed. Set `width` and `height` to match the aspect ratio of the game to reduce the margins.
+The image is scaled proportionally and letterboxed. Turn on **按画面比例自适应** in the context menu, which derives the height from the game, or set `width` and `height` to match the aspect ratio to reduce the margins.
 
 **The thumbnail is too small or too large on a high-DPI display.**
 Dimensions are specified in physical pixels. Set `width` and `height` according to the display scale factor.
 
+**Starting the program again appears to do nothing.**
+Only one copy runs at a time. The copy that is already running shows a balloon pointing at its notification-area icon.
+
+**Something is wrong and there is no console to read.**
+Open `%LOCALAPPDATA%\SidePeek\sidepeek.log`. Startup, target changes, hotkey conflicts, resume handling and unhandled exceptions are all recorded there.
+
 **How can SidePeek be started at login?**
-Place a shortcut to `SidePeek.exe`, or to `pythonw run.py`, in the directory opened by `shell:startup`.
+Right-click the notification-area icon and enable **开机自动启动**. This writes a per-user `Run` entry and needs no administrator rights. A shortcut in the directory opened by `shell:startup` works as well.
 
 ## Demonstration recording
 

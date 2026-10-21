@@ -90,6 +90,11 @@ class SaveRuntimeTest(unittest.TestCase):
         self.assertEqual(peek["anchor"], "custom")
         self.assertEqual(peek["pos"], [11, 22])
 
+    def test_fit_aspect_is_persisted(self):
+        # dragging the resize handle turns it off; that has to survive a restart
+        save_runtime(self.path, Settings(fit_aspect=False))
+        self.assertFalse(self._read()["peek"]["fit_aspect"])
+
     def test_skipped_fields_are_left_untouched(self):
         # a one-off `--width 700` must not become the saved width
         save_runtime(self.path, Settings(width=700, height=400), skip=("width",))

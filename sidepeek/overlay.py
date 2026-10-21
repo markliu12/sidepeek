@@ -27,6 +27,8 @@ import traceback
 from . import win32
 from .capture import WindowCapture
 from .config import Settings, app_dir
+from .diag import log
+from .instance import PING_MESSAGE
 from .watcher import Target
 from .win32 import H, gdi32, user32
 
@@ -47,6 +49,7 @@ COLOR_SHADOW = win32.rgb(0x00, 0x00, 0x00)
 MENU_ACTIVATE = 1001
 MENU_TOGGLE = 1003
 MENU_QUIT = 1004
+MENU_FIT = 1005
 
 # notification area
 TRAY_UID = 1
@@ -54,6 +57,7 @@ WM_TRAY_CALLBACK = win32.WM_APP + 2
 TRAY_MENU_ACTIVATE = 2001
 TRAY_MENU_TOGGLE = 2003
 TRAY_MENU_QUIT = 2004
+TRAY_MENU_AUTOSTART = 2005
 
 # target picker, shared by the notification area menu and the thumbnail menu
 MENU_TARGET_AUTO = 2100
@@ -129,7 +133,9 @@ class Overlay:
         self.on_toggle_pause = lambda: None
         self.on_lock = lambda: None
         self.on_select_target = lambda target: None
+        self.on_toggle_autostart = lambda: None
         self.candidates_provider = lambda: []
+        self.autostart_provider = lambda: False
         self._locked_target: Target | None = None
         self._menu_choices: dict[int, Target | None] = {}
 
@@ -140,6 +146,9 @@ class Overlay:
         self._drag_start = (0, 0)
         self._drag_moved = False
         self._shown_at = 0.0
+        #: set while the program resizes itself, so WM_SIZE can tell that the
+        #: new geometry was not chosen by the user
+        self._auto_resize = False
 
         self._brush_accent = 0
         self._brush_bg = 0
@@ -271,6 +280,25 @@ class Overlay:
         nid.szTip = tray_tooltip(self._paused)
         win32.shell32.Shell_NotifyIconW(win32.NIM_MODIFY, ctypes.byref(nid))
 
+    def notify(self, title: str, text: str, warning: bool = False) -> bool:
+        """Show a balloon from the notification area icon.
+
+        The packaged build has no console, so this is the only way to tell the
+        user about something that needs their attention - a hotkey that could
+        not be registered, or a second copy being started.
+        """
+        if not (self.hwnd and self.tray_icon and self._tray_added):
+            return False
+        nid = win32.NOTIFYICONDATAW()
+        nid.cbSize = ctypes.sizeof(win32.NOTIFYICONDATAW)
+        nid.hWnd = self.hwnd
+        nid.uID = TRAY_UID
+        nid.uFlags = win32.NIF_INFO
+        nid.szInfo = text
+        nid.szInfoTitle = title
+        nid.dwInfoFlags = win32.NIIF_WARNING if warning else win32.NIIF_INFO
+        return bool(win32.shell32.Shell_NotifyIconW(win32.NIM_MODIFY, ctypes.byref(nid)))
+
     def set_paused(self, paused: bool) -> None:
         self._paused = paused
         self._update_tray_tooltip()
@@ -319,6 +347,18 @@ class Overlay:
 
         user32.AppendMenuW(parent, win32.MF_POPUP, submenu, "监视窗口")
 
+    def _append_view_menu(self, parent) -> None:
+        """Add the "fit to the picture" toggle.
+
+        Without this there is no way back: dragging the resize handle turns
+        ``fit_aspect`` off (an explicitly chosen size must not be overridden
+        the next time the thumbnail appears), so the entry is also the undo.
+        """
+        flags = win32.MF_STRING | (
+            win32.MF_CHECKED if self.settings.fit_aspect else 0
+        )
+        user32.AppendMenuW(parent, flags, MENU_FIT, "按画面比例自适应")
+
     def _on_tray_callback(self, event: int) -> None:
         if event in (win32.WM_RBUTTONUP, win32.WM_CONTEXTMENU):
             self._open_tray_menu()
@@ -335,6 +375,7 @@ class Overlay:
             )
             user32.AppendMenuW(menu, activate_flags, TRAY_MENU_ACTIVATE, "回到游戏窗口")
             self._append_target_menu(menu)
+            self._append_view_menu(menu)
             user32.AppendMenuW(menu, win32.MF_SEPARATOR, 0, None)
             toggle_flags = win32.MF_STRING | (
                 win32.MF_CHECKED if self._paused else 0
@@ -342,6 +383,13 @@ class Overlay:
             user32.AppendMenuW(
                 menu, toggle_flags, TRAY_MENU_TOGGLE,
                 "恢复监视" if self._paused else "暂停监视",
+            )
+            user32.AppendMenuW(menu, win32.MF_SEPARATOR, 0, None)
+            autostart_flags = win32.MF_STRING | (
+                win32.MF_CHECKED if self.autostart_provider() else 0
+            )
+            user32.AppendMenuW(
+                menu, autostart_flags, TRAY_MENU_AUTOSTART, "开机自动启动",
             )
             user32.AppendMenuW(menu, win32.MF_SEPARATOR, 0, None)
             user32.AppendMenuW(menu, win32.MF_STRING, TRAY_MENU_QUIT, "退出 SidePeek")
@@ -372,6 +420,10 @@ class Overlay:
             self.on_activate()
         elif cmd == TRAY_MENU_TOGGLE:
             self.on_toggle_pause()
+        elif cmd == TRAY_MENU_AUTOSTART:
+            self.on_toggle_autostart()
+        elif cmd == MENU_FIT:
+            self.toggle_fit_aspect()
         elif cmd == TRAY_MENU_QUIT:
             self.on_quit()
 
@@ -467,6 +519,22 @@ class Overlay:
         self.on_toggle_pause()
         return True
 
+    def toggle_fit_aspect(self) -> bool:
+        """Switch between "the height follows the game" and a fixed shape.
+
+        Dragging the resize handle switches it off, because a size the user
+        picked by hand must survive the next time the thumbnail appears; this
+        method is therefore also the way back.
+        """
+        self.settings.fit_aspect = not self.settings.fit_aspect
+        log(f"fit_aspect = {self.settings.fit_aspect}")
+        if self.settings.fit_aspect:
+            self._apply_source_aspect()
+            self._apply_layout()
+        if self.hwnd:
+            user32.InvalidateRect(self.hwnd, None, False)
+        return self.settings.fit_aspect
+
     # ------------------------------------------------------------------
     # renderer selection
     # ------------------------------------------------------------------
@@ -493,10 +561,17 @@ class Overlay:
 
         self._height = target_h
         self.settings.height = target_h
-        user32.SetWindowPos(
-            self.hwnd, None, 0, 0, self._width, target_h,
-            win32.SWP_NOMOVE | win32.SWP_NOZORDER | win32.SWP_NOACTIVATE,
-        )
+        # WM_SIZE is dispatched synchronously from inside SetWindowPos, so the
+        # flag must be raised around the call: it tells the handler that this
+        # geometry was computed by us, not chosen by dragging the corner.
+        self._auto_resize = True
+        try:
+            user32.SetWindowPos(
+                self.hwnd, None, 0, 0, self._width, target_h,
+                win32.SWP_NOMOVE | win32.SWP_NOZORDER | win32.SWP_NOACTIVATE,
+            )
+        finally:
+            self._auto_resize = False
 
     def _attach(self, target: Target) -> None:
         backend = self.settings.backend
@@ -596,6 +671,22 @@ class Overlay:
         if self.mode == "dwm" and self.thumb is not None:
             self._update_dwm()
 
+    def _reattach(self) -> None:
+        """Start over after a resume.
+
+        The compositor drops its thumbnails across sleep, leaving a frozen or
+        black picture behind a window that still believes it is showing one.
+        Re-registering requires a fresh attach, and ``show_target`` returns
+        early for an unchanged target, so the state has to be cleared here.
+        """
+        log("resumed from sleep; re-registering the thumbnail")
+        if self.visible:
+            self.hide()
+        else:
+            self._detach()
+            self.target = None
+        self.on_check()
+
     def _update_dwm(self) -> None:
         if self.thumb is None or win32.dwmapi is None:
             return
@@ -636,6 +727,16 @@ class Overlay:
         )
         if rgn:
             user32.SetWindowRgn(self.hwnd, rgn, True)
+
+    def _note_manual_size(self) -> None:
+        """A size chosen by dragging the corner switches the aspect fit off.
+
+        Keeping it on would make the height snap back the next time the
+        thumbnail appears, silently undoing what the user just did.
+        """
+        if self.settings.fit_aspect:
+            self.settings.fit_aspect = False
+            log("fit_aspect = False (size set by hand)")
 
     # ------------------------------------------------------------------
     # painting
@@ -835,6 +936,7 @@ class Overlay:
         try:
             user32.AppendMenuW(menu, win32.MF_STRING, MENU_ACTIVATE, "回到游戏窗口")
             self._append_target_menu(menu)
+            self._append_view_menu(menu)
             user32.AppendMenuW(menu, win32.MF_STRING, MENU_TOGGLE, "暂停 / 恢复监视")
             user32.AppendMenuW(menu, win32.MF_SEPARATOR, 0, None)
             user32.AppendMenuW(menu, win32.MF_STRING, MENU_QUIT, "退出 SidePeek")
@@ -856,6 +958,8 @@ class Overlay:
             self.on_activate()
         elif cmd == MENU_TOGGLE:
             self.on_toggle_pause()
+        elif cmd == MENU_FIT:
+            self.toggle_fit_aspect()
         elif cmd == MENU_QUIT:
             self.on_quit()
 
@@ -884,6 +988,15 @@ class Overlay:
         if msg == win32.WM_APP + 1:          # foreground changed
             self.on_check()
             return 0
+        if msg == PING_MESSAGE:
+            # a second copy of the program was started and is about to exit;
+            # tell the user where the running one lives
+            log("a second copy asked for attention; announcing the tray icon")
+            self.notify(
+                "SidePeek 已经在运行",
+                "不需要再启动一次 —— 图标在通知区域，双击可暂停或恢复监视。",
+            )
+            return 0
         if msg == WM_TRAY_CALLBACK:
             self._on_tray_callback(int(lparam) & 0xFFFF)
             return 0
@@ -908,11 +1021,19 @@ class Overlay:
             self._open_menu()
             return 0
         if msg == win32.WM_SIZE:
+            if int(wparam) == win32.SIZE_MINIMIZED:
+                # the client area is 0x0 here; treating it as a real size used
+                # to clamp the window to 160x90 and persist that
+                return 0
             rect = win32.client_rect(hwnd)
             self._width = max(MIN_WIDTH, rect[2] - rect[0])
             self._height = max(MIN_HEIGHT, rect[3] - rect[1])
             self.settings.width = self._width
             self.settings.height = self._height
+            if not self._auto_resize:
+                self._note_manual_size()
+            # a window region does not follow a resize on its own
+            self._apply_round_corners()
             if self.settings.anchor != "custom":
                 self._place()
             self._apply_layout()
@@ -922,6 +1043,12 @@ class Overlay:
             if self.settings.anchor != "custom":
                 self._place()
             return 0
+        if msg == win32.WM_POWERBROADCAST:
+            if int(wparam) in (
+                win32.PBT_APMRESUMESUSPEND, win32.PBT_APMRESUMEAUTOMATIC
+            ):
+                self._reattach()
+            return 1
         if msg == win32.WM_HOTKEY:
             self._on_hotkey(int(wparam))
             return 0
