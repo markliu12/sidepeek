@@ -9,6 +9,7 @@ from sidepeek.overlay import (
     TRAY_MENU_QUIT,
     TRAY_MENU_TOGGLE,
     Overlay,
+    fitted_height,
     tray_tooltip,
 )
 
@@ -44,6 +45,50 @@ class ContentBoxTest(unittest.TestCase):
         self.assertLessEqual(bottom, overlay._height)
         self.assertLessEqual(right, overlay._width)
         self.assertGreater(bottom - top, 0)
+
+
+class FitAspectTest(unittest.TestCase):
+    """The height follows the game, so no aspect ratio is favoured."""
+
+    PAD = 6
+    CAPTION = 22
+
+    def height_for(self, source):
+        return fitted_height(492, source, self.PAD, self.CAPTION)
+
+    def test_16_by_9_keeps_the_default_height(self):
+        self.assertEqual(self.height_for((1920, 1080)), 304)
+
+    def test_16_by_10_gets_a_taller_window(self):
+        # 480 wide picture at 16:10 is 300 tall, plus padding and caption
+        self.assertEqual(self.height_for((2560, 1600)), 334)
+
+    def test_ultrawide_gets_a_shorter_window(self):
+        height = self.height_for((2560, 1080))
+        inner_h = height - 2 * self.PAD - self.CAPTION
+        self.assertAlmostEqual(480 / inner_h, 2560 / 1080, delta=0.02)
+
+    def test_four_by_three(self):
+        self.assertEqual(self.height_for((1024, 768)), 394)
+
+    def test_resulting_picture_area_matches_the_source(self):
+        for source in ((1920, 1080), (2560, 1600), (2560, 1080), (1024, 768), (1600, 900)):
+            height = self.height_for(source)
+            inner_w = 492 - 2 * self.PAD
+            inner_h = height - 2 * self.PAD - self.CAPTION
+            self.assertAlmostEqual(inner_w / inner_h, source[0] / source[1], delta=0.03)
+
+    def test_without_caption_the_height_drops(self):
+        with_caption = fitted_height(492, (1920, 1080), 6, 22)
+        without = fitted_height(492, (1920, 1080), 6, 0)
+        self.assertEqual(with_caption - without, 22)
+
+    def test_unknown_source_leaves_the_size_alone(self):
+        self.assertEqual(fitted_height(492, (0, 0), 6, 22), 0)
+
+    def test_minimum_height_is_respected(self):
+        # a very wide game at a very small width would otherwise go tiny
+        self.assertGreaterEqual(fitted_height(160, (2560, 400), 6, 22), 90)
 
 
 class TrayTest(unittest.TestCase):

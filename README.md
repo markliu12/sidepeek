@@ -89,7 +89,7 @@ Detection can be bypassed by specifying `peek.targets` or by locking a window wi
 
 The thumbnail is frameless, always on top, and never activated by the pointer. It can be dragged with the left mouse button and resized by dragging the lower-right corner; both the size and the position are written to `config.json` on exit. The minimum size is 160 × 90 pixels. A single click returns focus to the game window. A right-click opens a context menu.
 
-The default size of 492 × 304 leaves a 480 × 270 picture area once the 6 px padding and the 22 px caption strip are subtracted, so games rendered at 16:9 fill the thumbnail without letterboxing. Changing `width` and `height` without preserving that ratio reintroduces the bars.
+The width is the dimension the user controls. With `fit_aspect` enabled (the default) the height is derived from the aspect ratio of the game, so 16:9, 16:10, 21:9 and 4:3 titles all fill the picture area without black bars; the starting height of 304 corresponds to 16:9 and is corrected the first time a game is shown. Disabling `fit_aspect` freezes the window shape, in which case the picture is letterboxed to fit.
 
 ### Notification area
 
@@ -168,6 +168,7 @@ The configuration file is JSON. Missing keys fall back to the defaults; unknown 
 | `padding` | `6` | Space between the border and the image. |
 | `opacity` | `100` | Image opacity, 10 to 100. Applies to the `dwm` backend. |
 | `caption` | `true` | Displays a footer with the process name and the elapsed time in background. |
+| `fit_aspect` | `true` | Derives the height from the aspect ratio of the game so the picture fills the frame. |
 | `click_to_focus` | `true` | A single click returns focus to the game. |
 | `hide_when_minimized` | `true` | Hides the thumbnail while the game is minimized. |
 | `hide_when_hovered` | `false` | Hides the thumbnail while the pointer is over it. |
