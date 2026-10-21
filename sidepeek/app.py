@@ -103,6 +103,7 @@ class App:
               f"{self.settings.hotkey_toggle}=pause/resume  "
               f"{self.settings.hotkey_lock}=lock current window  "
               f"{self.settings.hotkey_quit}=quit")
+        print(f"[sidepeek] tray icon: {'ok' if self.overlay.tray_added else 'unavailable'}")
 
         self.check()
         try:
@@ -186,6 +187,7 @@ class App:
 
     def toggle_pause(self) -> None:
         self.watcher.paused = not self.watcher.paused
+        self.overlay.set_paused(self.watcher.paused)
         print(f"[sidepeek] {'paused' if self.watcher.paused else 'resumed'}")
         self.check()
 

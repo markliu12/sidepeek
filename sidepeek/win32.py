@@ -19,6 +19,7 @@ from ctypes import wintypes as wt
 user32 = ctypes.WinDLL("user32", use_last_error=True)
 gdi32 = ctypes.WinDLL("gdi32", use_last_error=True)
 kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+shell32 = ctypes.WinDLL("shell32", use_last_error=True)
 
 try:
     dwmapi = ctypes.WinDLL("dwmapi")
@@ -100,6 +101,8 @@ WM_RBUTTONUP = 0x0205
 WM_MOUSEWHEEL = 0x020A
 WM_HOTKEY = 0x0312
 WM_DISPLAYCHANGE = 0x007E
+WM_CONTEXTMENU = 0x007B
+WM_LBUTTONDBLCLK = 0x0203
 WM_APP = 0x8000
 
 HTCLIENT = 1
@@ -162,6 +165,20 @@ DWMWA_EXTENDED_FRAME_BOUNDS = 9
 DWMWA_WINDOW_CORNER_PREFERENCE = 33
 DWMWCP_ROUND = 2
 
+# notification area
+NIM_ADD = 0x00000000
+NIM_MODIFY = 0x00000001
+NIM_DELETE = 0x00000002
+NIF_MESSAGE = 0x00000001
+NIF_ICON = 0x00000002
+NIF_TIP = 0x00000004
+IMAGE_ICON = 1
+LR_LOADFROMFILE = 0x0010
+LR_DEFAULTSIZE = 0x0040
+IDI_APPLICATION = 32512
+MF_CHECKED = 0x00000008
+MF_GRAYED = 0x00000001
+
 
 # --------------------------------------------------------------------------
 # Structures
@@ -214,6 +231,35 @@ class MINMAXINFO(ctypes.Structure):
         ("ptMaxPosition", wt.POINT),
         ("ptMinTrackSize", wt.POINT),
         ("ptMaxTrackSize", wt.POINT),
+    ]
+
+
+class GUID(ctypes.Structure):
+    _fields_ = [
+        ("Data1", wt.DWORD),
+        ("Data2", wt.WORD),
+        ("Data3", wt.WORD),
+        ("Data4", ctypes.c_ubyte * 8),
+    ]
+
+
+class NOTIFYICONDATAW(ctypes.Structure):
+    _fields_ = [
+        ("cbSize", wt.DWORD),
+        ("hWnd", H),
+        ("uID", wt.UINT),
+        ("uFlags", wt.UINT),
+        ("uCallbackMessage", wt.UINT),
+        ("hIcon", H),
+        ("szTip", ctypes.c_wchar * 128),
+        ("dwState", wt.DWORD),
+        ("dwStateMask", wt.DWORD),
+        ("szInfo", ctypes.c_wchar * 256),
+        ("uVersion", wt.UINT),
+        ("szInfoTitle", ctypes.c_wchar * 64),
+        ("dwInfoFlags", wt.DWORD),
+        ("guidItem", GUID),
+        ("hBalloonIcon", H),
     ]
 
 
@@ -465,6 +511,30 @@ user32.GetWindowLongPtrW.restype = LONG_PTR
 user32.SetWindowLongPtrW = getattr(user32, "SetWindowLongPtrW", user32.SetWindowLongW)
 user32.SetWindowLongPtrW.argtypes = [H, ctypes.c_int, LONG_PTR]
 user32.SetWindowLongPtrW.restype = LONG_PTR
+
+user32.LoadImageW.argtypes = [H, wt.LPCWSTR, wt.UINT, ctypes.c_int, ctypes.c_int, wt.UINT]
+user32.LoadImageW.restype = H
+
+user32.LoadIconW.argtypes = [H, H]
+user32.LoadIconW.restype = H
+
+user32.DestroyIcon.argtypes = [H]
+user32.DestroyIcon.restype = wt.BOOL
+
+user32.RegisterWindowMessageW.argtypes = [wt.LPCWSTR]
+user32.RegisterWindowMessageW.restype = wt.UINT
+
+
+# --------------------------------------------------------------------------
+# shell32
+# --------------------------------------------------------------------------
+shell32.Shell_NotifyIconW.argtypes = [wt.DWORD, ctypes.POINTER(NOTIFYICONDATAW)]
+shell32.Shell_NotifyIconW.restype = wt.BOOL
+
+shell32.ExtractIconExW.argtypes = [
+    wt.LPCWSTR, ctypes.c_int, ctypes.POINTER(H), ctypes.POINTER(H), wt.UINT
+]
+shell32.ExtractIconExW.restype = wt.UINT
 
 
 # --------------------------------------------------------------------------

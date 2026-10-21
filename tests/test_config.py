@@ -33,14 +33,14 @@ class LoadTest(unittest.TestCase):
         settings, path = _quiet_load(self.path)
         self.assertEqual(path, self.path)
         self.assertTrue(os.path.isfile(self.path))
-        self.assertEqual((settings.width, settings.height), (480, 270))
+        self.assertEqual((settings.width, settings.height), (492, 304))
         self.assertTrue(self._read()["peek"]["caption"])
 
     def test_partial_file_keeps_other_defaults(self):
         self._write({"peek": {"width": 600}})
         settings, _ = _quiet_load(self.path)
         self.assertEqual(settings.width, 600)
-        self.assertEqual(settings.height, 270)          # untouched default
+        self.assertEqual(settings.height, 304)          # untouched default
         self.assertEqual(settings.backend, "auto")
 
     def test_unknown_keys_are_ignored(self):
@@ -68,7 +68,7 @@ class LoadTest(unittest.TestCase):
             fh.write("{ not json")
         with contextlib.redirect_stdout(io.StringIO()):
             settings, _ = load(self.path)
-        self.assertEqual(settings.width, 480)
+        self.assertEqual(settings.width, 492)
 
 
 class SaveRuntimeTest(unittest.TestCase):
@@ -94,7 +94,7 @@ class SaveRuntimeTest(unittest.TestCase):
         # a one-off `--width 700` must not become the saved width
         save_runtime(self.path, Settings(width=700, height=400), skip=("width",))
         peek = self._read()["peek"]
-        self.assertEqual(peek["width"], 480)
+        self.assertEqual(peek["width"], 492)
         self.assertEqual(peek["height"], 400)
 
     def test_unrelated_keys_survive(self):

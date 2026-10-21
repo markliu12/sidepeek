@@ -19,13 +19,14 @@ is identical in both modes.
 from __future__ import annotations
 
 import ctypes
+import os
 import sys
 import time
 import traceback
 
 from . import win32
 from .capture import WindowCapture
-from .config import Settings
+from .config import Settings, app_dir
 from .watcher import Target
 from .win32 import H, gdi32, user32
 
@@ -47,6 +48,19 @@ MENU_ACTIVATE = 1001
 MENU_CLEAR_TARGET = 1002
 MENU_TOGGLE = 1003
 MENU_QUIT = 1004
+
+# notification area
+TRAY_UID = 1
+WM_TRAY_CALLBACK = win32.WM_APP + 2
+TRAY_MENU_ACTIVATE = 2001
+TRAY_MENU_CLEAR_TARGET = 2002
+TRAY_MENU_TOGGLE = 2003
+TRAY_MENU_QUIT = 2004
+
+
+def tray_tooltip(paused: bool) -> str:
+    """Text shown when the pointer rests on the notification area icon."""
+    return "SidePeek — 已暂停" if paused else "SidePeek — 监视中"
 
 
 def _signed_short(value: int) -> int:
@@ -108,6 +122,13 @@ class Overlay:
         self._cursor_arrow = 0
         self._cursor_size = 0
 
+        # notification area
+        self.tray_icon = None
+        self._tray_added = False
+        self._paused = False
+        self._owned_icons: list[int] = []
+        self._taskbar_created = 0
+
     # ------------------------------------------------------------------
     # window lifecycle
     # ------------------------------------------------------------------
@@ -144,7 +165,148 @@ class Overlay:
         self._cursor_size = user32.LoadCursorW(0, H(win32.IDC_SIZENWSE))
 
         self._apply_round_corners()
+        self._taskbar_created = user32.RegisterWindowMessageW("TaskbarCreated")
+        self._add_tray()
         return hwnd
+
+    # ------------------------------------------------------------------
+    # notification area
+    # ------------------------------------------------------------------
+    def _load_tray_icon(self):
+        """Prefer the icon embedded in the exe, then the shipped .ico file."""
+        if getattr(sys, "frozen", False):
+            large, small = H(), H()
+            try:
+                count = win32.shell32.ExtractIconExW(
+                    sys.executable, 0, ctypes.byref(large),
+                    ctypes.byref(small), 1,
+                )
+            except OSError:
+                count = 0
+            if count and small.value:
+                for icon in (small.value, large.value):
+                    if icon:
+                        self._owned_icons.append(icon)
+                return small.value
+
+        path = os.path.join(app_dir(), "assets", "sidepeek.ico")
+        if os.path.isfile(path):
+            icon = user32.LoadImageW(
+                None, path, win32.IMAGE_ICON, 16, 16, win32.LR_LOADFROMFILE
+            )
+            if icon:
+                self._owned_icons.append(icon)
+                return icon
+        return user32.LoadIconW(None, H(win32.IDI_APPLICATION))
+
+    def _add_tray(self) -> bool:
+        """Add (or re-add) the notification area icon."""
+        if not self.hwnd:
+            return False
+        if self.tray_icon is None:
+            self.tray_icon = self._load_tray_icon()
+        if not self.tray_icon:
+            return False
+
+        nid = win32.NOTIFYICONDATAW()
+        nid.cbSize = ctypes.sizeof(win32.NOTIFYICONDATAW)
+        nid.hWnd = self.hwnd
+        nid.uID = TRAY_UID
+        nid.uFlags = win32.NIF_MESSAGE | win32.NIF_ICON | win32.NIF_TIP
+        nid.uCallbackMessage = WM_TRAY_CALLBACK
+        nid.hIcon = self.tray_icon
+        nid.szTip = tray_tooltip(self._paused)
+        self._tray_added = bool(
+            win32.shell32.Shell_NotifyIconW(win32.NIM_ADD, ctypes.byref(nid))
+        )
+        return self._tray_added
+
+    def _remove_tray(self) -> None:
+        if self.hwnd and self.tray_icon:
+            nid = win32.NOTIFYICONDATAW()
+            nid.cbSize = ctypes.sizeof(win32.NOTIFYICONDATAW)
+            nid.hWnd = self.hwnd
+            nid.uID = TRAY_UID
+            win32.shell32.Shell_NotifyIconW(win32.NIM_DELETE, ctypes.byref(nid))
+        self._tray_added = False
+        for icon in self._owned_icons:
+            user32.DestroyIcon(H(icon))
+        self._owned_icons.clear()
+        self.tray_icon = None
+
+    def _update_tray_tooltip(self) -> None:
+        if not (self.hwnd and self.tray_icon and self._tray_added):
+            return
+        nid = win32.NOTIFYICONDATAW()
+        nid.cbSize = ctypes.sizeof(win32.NOTIFYICONDATAW)
+        nid.hWnd = self.hwnd
+        nid.uID = TRAY_UID
+        nid.uFlags = win32.NIF_TIP
+        nid.szTip = tray_tooltip(self._paused)
+        win32.shell32.Shell_NotifyIconW(win32.NIM_MODIFY, ctypes.byref(nid))
+
+    def set_paused(self, paused: bool) -> None:
+        self._paused = paused
+        self._update_tray_tooltip()
+
+    @property
+    def tray_added(self) -> bool:
+        return self._tray_added
+
+    def _on_tray_callback(self, event: int) -> None:
+        if event in (win32.WM_RBUTTONUP, win32.WM_CONTEXTMENU):
+            self._open_tray_menu()
+        elif event == win32.WM_LBUTTONDBLCLK:
+            self.on_toggle_pause()
+
+    def _open_tray_menu(self) -> None:
+        menu = user32.CreatePopupMenu()
+        if not menu:
+            return
+        try:
+            activate_flags = win32.MF_STRING | (
+                0 if self.target else win32.MF_GRAYED
+            )
+            user32.AppendMenuW(menu, activate_flags, TRAY_MENU_ACTIVATE, "回到游戏窗口")
+            user32.AppendMenuW(menu, win32.MF_STRING, TRAY_MENU_CLEAR_TARGET, "清除当前目标")
+            user32.AppendMenuW(menu, win32.MF_SEPARATOR, 0, None)
+            toggle_flags = win32.MF_STRING | (
+                win32.MF_CHECKED if self._paused else 0
+            )
+            user32.AppendMenuW(
+                menu, toggle_flags, TRAY_MENU_TOGGLE,
+                "恢复监视" if self._paused else "暂停监视",
+            )
+            user32.AppendMenuW(menu, win32.MF_SEPARATOR, 0, None)
+            user32.AppendMenuW(menu, win32.MF_STRING, TRAY_MENU_QUIT, "退出 SidePeek")
+
+            pt = win32.wt.POINT()
+            user32.GetCursorPos(ctypes.byref(pt))
+            # A tray menu only dismisses correctly when its owner is foreground.
+            win32.force_foreground(self.hwnd)
+            cmd = user32.TrackPopupMenu(
+                menu,
+                win32.TPM_RETURNCMD | win32.TPM_RIGHTBUTTON | win32.TPM_NONOTIFY,
+                pt.x, pt.y, 0, self.hwnd, None,
+            )
+            # classic workaround: the first click after the menu closes is
+            # otherwise swallowed by the menu loop
+            user32.PostMessageW(self.hwnd, 0, 0, 0)
+        finally:
+            user32.DestroyMenu(menu)
+
+        if cmd:
+            self._on_tray_command(cmd)
+
+    def _on_tray_command(self, cmd: int) -> None:
+        if cmd == TRAY_MENU_ACTIVATE:
+            self.on_activate()
+        elif cmd == TRAY_MENU_CLEAR_TARGET:
+            self.on_clear_target()
+        elif cmd == TRAY_MENU_TOGGLE:
+            self.on_toggle_pause()
+        elif cmd == TRAY_MENU_QUIT:
+            self.on_quit()
 
     def _hinstance(self) -> int:
         return win32.kernel32.GetModuleHandleW(None)
@@ -626,6 +788,13 @@ class Overlay:
         if msg == win32.WM_APP + 1:          # foreground changed
             self.on_check()
             return 0
+        if msg == WM_TRAY_CALLBACK:
+            self._on_tray_callback(int(lparam) & 0xFFFF)
+            return 0
+        if self._taskbar_created and msg == self._taskbar_created:
+            # Explorer restarted: the icon was destroyed with the old taskbar
+            self._add_tray()
+            return 0
         if msg == win32.WM_NCHITTEST:
             pt = win32.wt.POINT(_signed_short(lparam), _signed_short(lparam >> 16))
             user32.ScreenToClient(hwnd, ctypes.byref(pt))
@@ -680,6 +849,7 @@ class Overlay:
 
     def _cleanup(self) -> None:
         self._detach()
+        self._remove_tray()
         Overlay._instances.pop(self.hwnd, None)
         for brush in (self._brush_accent, self._brush_bg, self._brush_bar):
             if brush:
