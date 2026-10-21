@@ -95,7 +95,7 @@ The width is the dimension the user controls. With `fit_aspect` enabled (the def
 
 SidePeek places an icon in the notification area for as long as it runs. It remains available while the thumbnail is hidden, which makes it the reliable way to reach the program when no console window is open.
 
-- **Right-click** opens a menu: return to the game window, clear the current target, pause or resume monitoring, and quit.
+- **Right-click** opens a menu: return to the game window, pause or resume monitoring, and quit.
 - **Double-click** pauses or resumes monitoring.
 - The tooltip reports the current state (`SidePeek — 监视中` or `SidePeek — 已暂停`).
 

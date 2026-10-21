@@ -45,7 +45,6 @@ COLOR_TEXT = win32.rgb(0xD7, 0xDE, 0xE9)
 COLOR_SHADOW = win32.rgb(0x00, 0x00, 0x00)
 
 MENU_ACTIVATE = 1001
-MENU_CLEAR_TARGET = 1002
 MENU_TOGGLE = 1003
 MENU_QUIT = 1004
 
@@ -53,7 +52,6 @@ MENU_QUIT = 1004
 TRAY_UID = 1
 WM_TRAY_CALLBACK = win32.WM_APP + 2
 TRAY_MENU_ACTIVATE = 2001
-TRAY_MENU_CLEAR_TARGET = 2002
 TRAY_MENU_TOGGLE = 2003
 TRAY_MENU_QUIT = 2004
 
@@ -125,7 +123,6 @@ class Overlay:
         self.on_quit = lambda: None
         self.on_activate = lambda: None
         self.on_toggle_pause = lambda: None
-        self.on_clear_target = lambda: None
         self.on_lock = lambda: None
 
         self._width = settings.width
@@ -289,7 +286,6 @@ class Overlay:
                 0 if self.target else win32.MF_GRAYED
             )
             user32.AppendMenuW(menu, activate_flags, TRAY_MENU_ACTIVATE, "回到游戏窗口")
-            user32.AppendMenuW(menu, win32.MF_STRING, TRAY_MENU_CLEAR_TARGET, "清除当前目标")
             user32.AppendMenuW(menu, win32.MF_SEPARATOR, 0, None)
             toggle_flags = win32.MF_STRING | (
                 win32.MF_CHECKED if self._paused else 0
@@ -322,8 +318,6 @@ class Overlay:
     def _on_tray_command(self, cmd: int) -> None:
         if cmd == TRAY_MENU_ACTIVATE:
             self.on_activate()
-        elif cmd == TRAY_MENU_CLEAR_TARGET:
-            self.on_clear_target()
         elif cmd == TRAY_MENU_TOGGLE:
             self.on_toggle_pause()
         elif cmd == TRAY_MENU_QUIT:
@@ -788,7 +782,6 @@ class Overlay:
             return
         try:
             user32.AppendMenuW(menu, win32.MF_STRING, MENU_ACTIVATE, "回到游戏窗口")
-            user32.AppendMenuW(menu, win32.MF_STRING, MENU_CLEAR_TARGET, "清除当前目标")
             user32.AppendMenuW(menu, win32.MF_STRING, MENU_TOGGLE, "暂停 / 恢复监视")
             user32.AppendMenuW(menu, win32.MF_SEPARATOR, 0, None)
             user32.AppendMenuW(menu, win32.MF_STRING, MENU_QUIT, "退出 SidePeek")
@@ -806,8 +799,6 @@ class Overlay:
 
         if cmd == MENU_ACTIVATE:
             self.on_activate()
-        elif cmd == MENU_CLEAR_TARGET:
-            self.on_clear_target()
         elif cmd == MENU_TOGGLE:
             self.on_toggle_pause()
         elif cmd == MENU_QUIT:
