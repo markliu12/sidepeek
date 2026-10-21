@@ -5,7 +5,6 @@ import unittest
 from sidepeek.config import Settings
 from sidepeek.overlay import (
     TRAY_MENU_ACTIVATE,
-    TRAY_MENU_CLEAR_TARGET,
     TRAY_MENU_QUIT,
     TRAY_MENU_TOGGLE,
     Overlay,
@@ -101,15 +100,13 @@ class TrayTest(unittest.TestCase):
         overlay = make_overlay()
         called = []
         overlay.on_activate = lambda: called.append("activate")
-        overlay.on_clear_target = lambda: called.append("clear")
         overlay.on_toggle_pause = lambda: called.append("toggle")
         overlay.on_quit = lambda: called.append("quit")
 
-        for command in (TRAY_MENU_ACTIVATE, TRAY_MENU_CLEAR_TARGET,
-                        TRAY_MENU_TOGGLE, TRAY_MENU_QUIT):
+        for command in (TRAY_MENU_ACTIVATE, TRAY_MENU_TOGGLE, TRAY_MENU_QUIT):
             overlay._on_tray_command(command)
 
-        self.assertEqual(called, ["activate", "clear", "toggle", "quit"])
+        self.assertEqual(called, ["activate", "toggle", "quit"])
 
     def test_unknown_command_is_ignored(self):
         overlay = make_overlay()

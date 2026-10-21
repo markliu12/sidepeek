@@ -104,9 +104,6 @@ class Watcher:
         self.last_game = self.locked
         return self.locked
 
-    def unlock(self) -> None:
-        self.locked = None
-
     def evaluate(self, overlay_hwnd: int = 0) -> Decision:
         s = self.settings
         if self.paused:

@@ -92,7 +92,6 @@ class App:
         self.overlay.on_quit = self.quit
         self.overlay.on_activate = self.activate_target
         self.overlay.on_toggle_pause = self.toggle_pause
-        self.overlay.on_clear_target = self.clear_target
         self.overlay.on_lock = self.lock_foreground
 
         self._install_hook()
@@ -190,11 +189,6 @@ class App:
         self.overlay.set_paused(self.watcher.paused)
         print(f"[sidepeek] {'paused' if self.watcher.paused else 'resumed'}")
         self.check()
-
-    def clear_target(self) -> None:
-        self.watcher.unlock()
-        self.watcher.last_game = None
-        self.overlay.hide()
 
     def lock_foreground(self) -> None:
         target = self.watcher.lock_foreground()
