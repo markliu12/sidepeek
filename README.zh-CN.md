@@ -36,13 +36,19 @@ python run.py
 
 首次启动时，程序会在自身目录下生成 `config.json`，其默认值见[配置](#配置)一节。
 
-### 构建独立可执行文件
+### 从发布版本获取
+
+`SidePeek.exe` 会随每个[发布版本](https://github.com/markliu12/sidepeek/releases)提供，无需安装。
+
+### 构建可执行文件
 
 ```bat
 build_exe.bat
 ```
 
-产物为 `dist\SidePeek.exe`，运行时不依赖 Python 环境。
+产物为 `dist\SidePeek.exe`，约 8 MB，运行时不依赖 Python 环境。图标与 Windows 版本资源分别取自 `assets/sidepeek.ico` 与 `version_info.txt`；若环境中缺少 PyInstaller，脚本会自动安装。首次启动时会在可执行文件同目录下生成 `config.json`。
+
+推送形如 `v*` 的标签会触发 `.github/workflows/build.yml`：构建可执行文件、校验版本资源是否存在，并同时作为工作流构件与发布附件上传。
 
 ## 行为说明
 

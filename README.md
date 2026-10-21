@@ -36,13 +36,19 @@ To start without a console window, use `pythonw run.py`.
 
 `config.json` is created in the program directory on first start, with the default values described under [Configuration](#configuration).
 
-### Standalone executable
+### From a release
+
+`SidePeek.exe` is attached to each [release](https://github.com/markliu12/sidepeek/releases). No installation is required.
+
+### Building the executable
 
 ```bat
 build_exe.bat
 ```
 
-The resulting executable is `dist\SidePeek.exe`. It requires no Python installation.
+The resulting executable is `dist\SidePeek.exe`, approximately 8 MB, and requires no Python installation. The icon and the Windows version resource are taken from `assets/sidepeek.ico` and `version_info.txt`; PyInstaller is installed automatically if it is unavailable. `config.json` is created next to the executable on first start.
+
+Pushing a tag matching `v*` triggers `.github/workflows/build.yml`, which builds the executable, verifies that the version resource is present, and uploads it both as a workflow artifact and as a release asset.
 
 ## Behavior
 

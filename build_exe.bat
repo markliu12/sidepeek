@@ -1,6 +1,6 @@
 @echo off
 REM Build a standalone SidePeek.exe with PyInstaller.
-REM Requires: python on PATH, pip install pyinstaller (installed automatically below).
+REM Requires: python on PATH. PyInstaller is installed automatically below.
 
 setlocal
 cd /d "%~dp0"
@@ -18,7 +18,11 @@ python -m PyInstaller ^
     --onefile ^
     --windowed ^
     --name SidePeek ^
+    --icon assets\sidepeek.ico ^
+    --version-file version_info.txt ^
     run.py || goto :err
+
+if not exist "dist\SidePeek.exe" goto :err
 
 echo.
 echo [build] done -^> dist\SidePeek.exe
