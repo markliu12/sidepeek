@@ -100,10 +100,18 @@ WM_LBUTTONUP = 0x0202
 WM_RBUTTONUP = 0x0205
 WM_MOUSEWHEEL = 0x020A
 WM_HOTKEY = 0x0312
+WM_POWERBROADCAST = 0x0218
+
+# wParam values of WM_POWERBROADCAST that mean "the machine came back"
+PBT_APMRESUMESUSPEND = 0x0007
+PBT_APMRESUMEAUTOMATIC = 0x0012
 WM_DISPLAYCHANGE = 0x007E
 WM_CONTEXTMENU = 0x007B
 WM_LBUTTONDBLCLK = 0x0203
 WM_APP = 0x8000
+
+#: wParam of WM_SIZE; the client area is meaningless while minimised
+SIZE_MINIMIZED = 1
 
 HTCLIENT = 1
 HTCAPTION = 2
@@ -173,6 +181,9 @@ NIM_DELETE = 0x00000002
 NIF_MESSAGE = 0x00000001
 NIF_ICON = 0x00000002
 NIF_TIP = 0x00000004
+NIF_INFO = 0x00000010
+NIIF_INFO = 0x00000001
+NIIF_WARNING = 0x00000002
 IMAGE_ICON = 1
 LR_LOADFROMFILE = 0x0010
 LR_DEFAULTSIZE = 0x0040
@@ -525,6 +536,12 @@ user32.DestroyIcon.restype = wt.BOOL
 user32.RegisterWindowMessageW.argtypes = [wt.LPCWSTR]
 user32.RegisterWindowMessageW.restype = wt.UINT
 
+user32.FindWindowW.argtypes = [wt.LPCWSTR, wt.LPCWSTR]
+user32.FindWindowW.restype = H
+
+user32.MessageBoxW.argtypes = [H, wt.LPCWSTR, wt.LPCWSTR, wt.UINT]
+user32.MessageBoxW.restype = ctypes.c_int
+
 
 # --------------------------------------------------------------------------
 # shell32
@@ -621,6 +638,15 @@ kernel32.QueryFullProcessImageNameW.argtypes = [
     H, wt.DWORD, wt.LPWSTR, ctypes.POINTER(wt.DWORD)
 ]
 kernel32.QueryFullProcessImageNameW.restype = wt.BOOL
+
+kernel32.CreateMutexW.argtypes = [ctypes.c_void_p, wt.BOOL, wt.LPCWSTR]
+kernel32.CreateMutexW.restype = H
+
+kernel32.ReleaseMutex.argtypes = [H]
+kernel32.ReleaseMutex.restype = wt.BOOL
+
+#: returned by GetLastError() when the named object already existed
+ERROR_ALREADY_EXISTS = 183
 
 
 # --------------------------------------------------------------------------

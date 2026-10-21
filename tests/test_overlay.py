@@ -1,11 +1,15 @@
 """Overlay layout and notification-area behaviour that does not need a window."""
 
+import contextlib
+import io
 import unittest
 
 from sidepeek.config import Settings
 from sidepeek.watcher import Target
 from sidepeek.overlay import (
+    MENU_FIT,
     TRAY_MENU_ACTIVATE,
+    TRAY_MENU_AUTOSTART,
     TRAY_MENU_QUIT,
     TRAY_MENU_TOGGLE,
     MENU_TARGET_AUTO,
@@ -140,6 +144,54 @@ class TrayTest(unittest.TestCase):
         overlay.set_paused(True)
         self.assertTrue(overlay._paused)
         self.assertFalse(overlay.tray_added)
+
+    def test_autostart_command_reaches_the_callback(self):
+        overlay = make_overlay()
+        called = []
+        overlay.on_toggle_autostart = lambda: called.append("autostart")
+        overlay._on_tray_command(TRAY_MENU_AUTOSTART)
+        self.assertEqual(called, ["autostart"])
+
+    def test_notify_without_a_tray_icon_does_nothing(self):
+        # nothing to attach a balloon to, and it must not raise
+        self.assertFalse(make_overlay().notify("title", "text"))
+        self.assertFalse(make_overlay().notify("title", "text", warning=True))
+
+
+class FitToggleTest(unittest.TestCase):
+    """A size chosen by hand must survive; the menu entry is the way back."""
+
+    def setUp(self):
+        # the toggle logs through diag; keep the test output readable
+        redirect = contextlib.redirect_stdout(io.StringIO())
+        redirect.__enter__()
+        self.addCleanup(redirect.__exit__, None, None, None)
+
+    def test_the_toggle_flips_the_setting(self):
+        overlay = make_overlay()
+        self.assertTrue(overlay.settings.fit_aspect)
+        self.assertFalse(overlay.toggle_fit_aspect())
+        self.assertTrue(overlay.toggle_fit_aspect())
+
+    def test_a_manual_resize_switches_auto_fit_off(self):
+        overlay = make_overlay()
+        overlay._note_manual_size()
+        self.assertFalse(overlay.settings.fit_aspect)
+
+    def test_a_manual_resize_while_auto_fit_is_off_changes_nothing(self):
+        overlay = make_overlay(fit_aspect=False)
+        overlay._note_manual_size()
+        self.assertFalse(overlay.settings.fit_aspect)
+
+    def test_the_menu_command_reaches_the_toggle(self):
+        overlay = make_overlay()
+        overlay._on_tray_command(MENU_FIT)
+        self.assertFalse(overlay.settings.fit_aspect)
+
+    def test_toggling_without_a_window_does_not_raise(self):
+        overlay = make_overlay()
+        overlay.toggle_fit_aspect()
+        self.assertFalse(overlay.settings.fit_aspect)
 
 
 if __name__ == "__main__":

@@ -13,6 +13,8 @@ import os
 import sys
 from dataclasses import dataclass
 
+from .diag import log
+
 DEFAULTS: dict = {
     "peek": {
         # Window size in physical pixels. The default leaves a 480x270 (16:9)
@@ -134,12 +136,12 @@ def load(path: str | None = None) -> tuple[Settings, str]:
             with open(path, "r", encoding="utf-8") as fh:
                 data = _merge(DEFAULTS, json.load(fh))
         except (OSError, ValueError) as exc:
-            print(f"[sidepeek] config unreadable ({exc}); using defaults")
+            log(f"config unreadable ({exc}); using defaults")
     else:
         try:
             with open(path, "w", encoding="utf-8") as fh:
                 json.dump(DEFAULTS, fh, indent=2, ensure_ascii=False)
-            print(f"[sidepeek] wrote default config to {path}")
+            log(f"wrote default config to {path}")
         except OSError:
             pass
 
@@ -190,6 +192,8 @@ def save_runtime(
         peek["width"] = settings.width
     if "height" not in skip:
         peek["height"] = settings.height
+    if "fit_aspect" not in skip:
+        peek["fit_aspect"] = settings.fit_aspect
     if "anchor" not in skip:
         peek["anchor"] = settings.anchor
         peek["pos"] = list(settings.pos)

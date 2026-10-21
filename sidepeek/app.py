@@ -6,11 +6,14 @@ import argparse
 import ctypes
 import sys
 
+from . import __version__
+from . import autostart, instance
 from . import config as config_mod
 from . import win32
 from .capture import WindowCapture
 from .config import Settings
-from .overlay import Overlay
+from .diag import install_excepthook, log, log_path
+from .overlay import CLASS_NAME, Overlay
 from .png import write_png
 from .watcher import Target, Watcher, covers_monitor, describe
 
@@ -85,7 +88,7 @@ class App:
         try:
             self.overlay.create()
         except OSError as exc:
-            print(f"[sidepeek] cannot create overlay window: {exc}")
+            log(f"cannot create overlay window: {exc}")
             return 1
 
         self.overlay.on_check = self.check
@@ -94,17 +97,19 @@ class App:
         self.overlay.on_toggle_pause = self.toggle_pause
         self.overlay.on_lock = self.lock_foreground
         self.overlay.on_select_target = self.select_target
+        self.overlay.on_toggle_autostart = self.toggle_autostart
         self.overlay.candidates_provider = self.watcher.candidates
+        self.overlay.autostart_provider = autostart.is_enabled
 
         self._install_hook()
         self._register_hotkeys()
         self.overlay.start_polling(self.settings.poll_ms)
 
-        print("[sidepeek] watching... hotkeys: "
-              f"{self.settings.hotkey_toggle}=pause/resume  "
-              f"{self.settings.hotkey_lock}=lock current window  "
-              f"{self.settings.hotkey_quit}=quit")
-        print(f"[sidepeek] tray icon: {'ok' if self.overlay.tray_added else 'unavailable'}")
+        log("watching... hotkeys: "
+            f"{self.settings.hotkey_toggle}=pause/resume  "
+            f"{self.settings.hotkey_lock}=lock current window  "
+            f"{self.settings.hotkey_quit}=quit")
+        log(f"tray icon: {'ok' if self.overlay.tray_added else 'unavailable'}")
 
         self.check()
         try:
@@ -148,16 +153,30 @@ class App:
             self.settings.hotkey_lock,
             self.settings.hotkey_quit,
         )
+        failed: list[str] = []
         for index, spec in enumerate(specs, start=1):
             if not spec:
                 continue
             mods, vk = parse_hotkey(spec)
             if not vk:
+                failed.append(spec)
                 continue
             if win32.user32.RegisterHotKey(self.overlay.hwnd, index, mods | win32.MOD_NOREPEAT, vk):
                 self._hotkeys.append(index)
             else:
-                print(f"[sidepeek] hotkey '{spec}' is taken; skipped")
+                failed.append(spec)
+
+        for spec in failed:
+            log(f"hotkey '{spec}' is taken or unparsable; skipped")
+        if failed:
+            # the packaged build has no console, so this is the only way the
+            # user can learn that a hotkey they rely on is not active
+            self.overlay.notify(
+                "SidePeek 热键被占用",
+                f"{'、'.join(failed)} 已被其他程序占用或无法识别。"
+                "相应功能仍可从通知区域菜单使用。",
+                warning=True,
+            )
 
     def _teardown(self) -> None:
         if self._hook:
@@ -189,14 +208,14 @@ class App:
     def toggle_pause(self) -> None:
         self.watcher.paused = not self.watcher.paused
         self.overlay.set_paused(self.watcher.paused)
-        print(f"[sidepeek] {'paused' if self.watcher.paused else 'resumed'}")
+        log(f"{'paused' if self.watcher.paused else 'resumed'}")
         self.check()
 
     def lock_foreground(self) -> None:
         target = self.watcher.lock_foreground()
         if target:
             self.overlay.set_locked(target)
-            print(f"[sidepeek] locked target: {target.display_name} ({target.exe})")
+            log(f"locked target: {target.display_name} ({target.exe})")
         self.check()
 
     def select_target(self, target: Target | None) -> None:
@@ -208,10 +227,28 @@ class App:
         self.watcher.locked = target
         self.overlay.set_locked(target)
         if target is None:
-            print("[sidepeek] target: automatic")
+            log("target: automatic")
         else:
-            print(f"[sidepeek] target: {target.display_name} ({target.exe})")
+            log(f"target: {target.display_name} ({target.exe})")
         self.check()
+
+    def toggle_autostart(self) -> None:
+        """Flip the HKCU Run entry and report the outcome."""
+        before = autostart.is_enabled()
+        after = autostart.toggle()
+        if after == before:
+            log("could not change the run-at-login value")
+            self.overlay.notify(
+                "SidePeek",
+                "无法修改开机启动设置（注册表写入被拒绝）。",
+                warning=True,
+            )
+            return
+        log(f"start with Windows: {'on' if after else 'off'}")
+        self.overlay.notify(
+            "SidePeek",
+            "下次登录 Windows 时将自动启动。" if after else "已取消开机自动启动。",
+        )
 
     def quit(self) -> None:
         win32.user32.PostQuitMessage(0)
@@ -346,6 +383,8 @@ def main(argv: list[str] | None = None) -> int:
         except (ValueError, OSError):
             pass
 
+    install_excepthook()
+
     args = build_parser().parse_args(argv)
     settings, path = config_mod.load(args.config)
 
@@ -372,6 +411,18 @@ def main(argv: list[str] | None = None) -> int:
     if args.screenshot:
         hint = settings.targets[0] if settings.targets else ""
         return do_screenshot(settings, args.screenshot, hint)
+
+    # The diagnostics above are one-shot and never touch hotkeys or the tray,
+    # so only the long-running mode needs the instance lock.
+    if not instance.acquire():
+        instance.ping_running_instance(CLASS_NAME)
+        log("another instance is already running; announced the existing one")
+        return 0
+
+    log(f"SidePeek {__version__} starting")
+    log(f"config: {path}")
+    log(f"log: {log_path()}")
+    log(f"windows build: {sys.getwindowsversion().build}")
 
     app = App(settings, path, frozenset(cli_overrides))
     return app.run()

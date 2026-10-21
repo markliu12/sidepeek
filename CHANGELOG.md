@@ -6,6 +6,40 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+### Added
+
+- **Single instance.** A named mutex keeps a second copy from running: it would otherwise
+  fight the first one for the global hotkeys and leave a second notification-area icon
+  behind. Starting the program again makes the running copy show a balloon pointing at
+  its icon, and the new process exits with code 0. The command-line diagnostics are
+  exempt, so they stay usable while the program runs.
+- **Log file.** Everything that used to go to stdout — startup, target changes, hotkey
+  conflicts, resume handling — is also appended to
+  `%LOCALAPPDATA%\SidePeek\sidepeek.log`, rolled over at 512 KB. Unhandled exceptions are
+  written there and shown in a message box; the windowed build used to fail silently.
+- **Run at login** in the notification area menu, backed by a per-user
+  `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` entry, so no administrator rights
+  are involved.
+- **Fit to the picture** (`按画面比例自适应`) in both context menus. Dragging the resize
+  handle now turns `fit_aspect` off — a size picked by hand must not be overridden the
+  next time the thumbnail appears — which makes this entry the way back.
+- Hotkey registration failures are reported with a notification-area balloon. With
+  `console=False` the old console line was invisible to everyone running the executable.
+
+### Changed
+
+- `fit_aspect` is now persisted with the rest of the layout instead of being read-only.
+
+### Fixed
+
+- Rounded corners were lost after a resize on Windows 10, which falls back to a window
+  region: the region was built once in `create()` and never rebuilt in `WM_SIZE`.
+- A frozen or black picture after resuming from sleep. Thumbnails do not survive a
+  suspend/resume cycle and `show_target` returned early for an unchanged target, so
+  nothing ever re-registered them; `WM_POWERBROADCAST` now forces a fresh attach.
+- Minimising the thumbnail collapsed the stored size to the 160 × 90 minimum, because
+  `WM_SIZE` treated the zero-sized client area of a minimised window as a real size.
+
 ## [0.3.0] - 2026-10-21
 
 ### Added
