@@ -8,6 +8,10 @@
 
 SidePeek is a Windows desktop utility that displays a live thumbnail of a game window while that window is in the background, and removes the thumbnail when the game window regains focus.
 
+![SidePeek showing a live CS2 thumbnail in the corner while another window is in use](docs/preview.png)
+
+*The thumbnail appears when the game loses focus, and disappears when it gets focus back.*
+
 ---
 
 ## Overview
@@ -279,9 +283,11 @@ Open `%LOCALAPPDATA%\SidePeek\sidepeek.log`. Startup, target changes, hotkey con
 **How can SidePeek be started at login?**
 Right-click the notification-area icon and enable **开机自动启动**. This writes a per-user `Run` entry and needs no administrator rights. A shortcut in the directory opened by `shell:startup` works as well.
 
-## Demonstration recording
+## Demonstration
 
-This repository does not currently include a demonstration recording. Contributions of a short recording at `docs/demo.gif` are welcome; ensure that no unrelated desktop content appears in the captured area.
+The screenshot at the top of this file shows the desktop effect; the original is `docs/preview.png`.
+
+This repository does not currently include a screen recording. Contributions of a short recording at `docs/demo.gif` are welcome; ensure that no unrelated desktop content appears in the captured area.
 
 ## Roadmap
 
