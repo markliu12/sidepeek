@@ -21,6 +21,7 @@ gdi32 = ctypes.WinDLL("gdi32", use_last_error=True)
 kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
 shell32 = ctypes.WinDLL("shell32", use_last_error=True)
 
+dwmapi: ctypes.WinDLL | None
 try:
     dwmapi = ctypes.WinDLL("dwmapi")
 except OSError:                                     # pragma: no cover
@@ -516,11 +517,11 @@ user32.SetProcessDpiAwarenessContext.restype = wt.BOOL
 user32.GetWindowLongW.argtypes = [H, ctypes.c_int]
 user32.GetWindowLongW.restype = ctypes.c_long
 
-user32.GetWindowLongPtrW = getattr(user32, "GetWindowLongPtrW", user32.GetWindowLongW)
+user32.GetWindowLongPtrW = getattr(user32, "GetWindowLongPtrW", user32.GetWindowLongW)  # type: ignore[attr-defined]
 user32.GetWindowLongPtrW.argtypes = [H, ctypes.c_int]
 user32.GetWindowLongPtrW.restype = LONG_PTR
 
-user32.SetWindowLongPtrW = getattr(user32, "SetWindowLongPtrW", user32.SetWindowLongW)
+user32.SetWindowLongPtrW = getattr(user32, "SetWindowLongPtrW", user32.SetWindowLongW)  # type: ignore[attr-defined]
 user32.SetWindowLongPtrW.argtypes = [H, ctypes.c_int, LONG_PTR]
 user32.SetWindowLongPtrW.restype = LONG_PTR
 

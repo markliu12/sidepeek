@@ -6,6 +6,18 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+### Added
+
+- **Type checking.** `mypy` runs over the source with a dedicated configuration
+  (`mypy.ini`) and as a separate CI job, catching type errors in the `ctypes`
+  layer before they ship.
+- **More targeted tests** for the capture path — the blank-frame heuristic and
+  the `grab` short-circuits — and for the `hide_when_hovered` / hidden-window
+  branches of the watch decision.
+- **Executable smoke test in CI.** The packaged build now runs
+  `SidePeek.exe --list` on the build runner, so a broken bundle (missing import,
+  bad `ctypes` binding, ...) fails the build instead of shipping silently.
+
 ### Changed
 
 - **Less work per frame for the `capture` backend.** The frame timer now

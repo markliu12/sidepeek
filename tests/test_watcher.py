@@ -146,6 +146,43 @@ class DecisionTest(WatcherHarness):
         self.assertFalse(decision.show)
         self.assertIsNone(watcher.last_game)
 
+    def test_hidden_target_clears_state(self):
+        # a window that exists but is no longer visible is not a game any more
+        self.add_window(777, "cs2.exe")
+        self.fg = 777
+        watcher = Watcher(Settings(targets=("cs2.exe",)))
+        self.assertFalse(watcher.evaluate().show)
+
+        self.visible.discard(777)           # window hidden (not destroyed)
+        self.fg = 111
+        decision = watcher.evaluate()
+        self.assertFalse(decision.show)
+        self.assertEqual(decision.reason, "target hidden")
+        self.assertIsNone(watcher.last_game)
+
+    def test_hovered_target_hides_when_hovered(self):
+        self.add_window(777, "cs2.exe")
+        self.add_window(111, "browser.exe")
+        self.fg = 111
+        watcher = Watcher(
+            Settings(targets=("cs2.exe",), hide_when_hovered=True)
+        )
+        with mock.patch.object(watcher, "_cursor_over", return_value=True):
+            decision = watcher.evaluate(overlay_hwnd=999)
+        self.assertFalse(decision.show)
+        self.assertEqual(decision.reason, "cursor over overlay")
+
+    def test_hovered_target_shows_when_cursor_away(self):
+        self.add_window(777, "cs2.exe")
+        self.add_window(111, "browser.exe")
+        self.fg = 111
+        watcher = Watcher(
+            Settings(targets=("cs2.exe",), hide_when_hovered=True)
+        )
+        with mock.patch.object(watcher, "_cursor_over", return_value=False):
+            decision = watcher.evaluate(overlay_hwnd=999)
+        self.assertTrue(decision.show)
+
 
 class CandidatesTest(WatcherHarness):
     """The list offered by the "监视窗口" menu."""

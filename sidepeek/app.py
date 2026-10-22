@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import ctypes
 import sys
+from typing import Any
 
 from . import __version__
 from . import autostart, instance
@@ -79,7 +80,7 @@ class App:
         self.overlay = Overlay(settings, config_path)
         self.watcher = Watcher(settings)
         self._hook = None
-        self._hook_ref = None
+        self._hook_ref: Any = None
         self._hotkeys: list[int] = []
         self._checking = False
 
