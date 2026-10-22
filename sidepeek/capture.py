@@ -130,7 +130,14 @@ class WindowCapture:
             user32.ReleaseDC(self.hwnd, src)
 
     def _looks_blank(self) -> bool:
-        """Cheap sanity check: sample a grid of pixels and look for light."""
+        """Cheap sanity check: sample a grid of pixels and look for light.
+
+        Sampling is done with ``memoryview`` slices of the raw frame buffer,
+        which avoids the per-pixel Python loop that used to run here every
+        frame. The ``b``/``g``/``r`` bytes are summed directly on the slice, so
+        the hot path is native ``sum`` over contiguous bytes rather than three
+        indexing operations per sample.
+        """
         if not self.bits:
             return True
         try:
@@ -140,13 +147,13 @@ class WindowCapture:
 
         px = self.width * self.height
         step = max(1, px // 1024)
+        view = memoryview(data)
         lit = 0
         seen = 0
-        for i in range(0, px, step):
-            off = i * 4
-            b, g, r = data[off], data[off + 1], data[off + 2]
+        for off in range(0, px * 4, step * 4):
+            b, g, r = view[off], view[off + 1], view[off + 2]
             seen += 1
-            if r + g + b > 18:
+            if b + g + r > 18:
                 lit += 1
         return seen == 0 or (lit / seen) < 0.02
 

@@ -6,6 +6,16 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+### Changed
+
+- **Less work per frame for the `capture` backend.** The frame timer now
+  invalidates only the picture rectangle instead of the whole overlay, so the
+  caption strip is no longer repainted at frame rate. Process image names are
+  cached by PID, which removes one `OpenProcess` + `QueryFullProcessImageNameW`
+  round-trip per window on every fallback enumeration, and the blank-frame
+  sanity check reads the frame through a `memoryview` instead of a per-pixel
+  Python loop.
+
 ## [0.4.0] - 2026-10-21
 
 ### Added

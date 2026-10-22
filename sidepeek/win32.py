@@ -710,12 +710,22 @@ def class_name(hwnd) -> str:
     return buf.value
 
 
+#: Process image names are immutable for the lifetime of a PID, and the watcher
+#: queries the same set of windows (and thus PIDs) over and over. Cache by PID
+#: so a full window enumeration no longer performs one ``OpenProcess`` +
+#: ``QueryFullProcessImageNameW`` round-trip per window, per poll.
+_process_name_cache: dict[int, str] = {}
+
+
 def process_name(hwnd) -> str:
     """Executable file name (``cs2.exe``) that owns ``hwnd``."""
     pid = wt.DWORD(0)
     user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
     if not pid.value:
         return ""
+    cached = _process_name_cache.get(pid.value)
+    if cached is not None:
+        return cached
     ph = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid.value)
     if not ph:
         return ""
@@ -724,7 +734,9 @@ def process_name(hwnd) -> str:
         size = wt.DWORD(1024)
         if not kernel32.QueryFullProcessImageNameW(ph, 0, buf, ctypes.byref(size)):
             return ""
-        return buf.value.rsplit("\\", 1)[-1]
+        name = buf.value.rsplit("\\", 1)[-1]
+        _process_name_cache[pid.value] = name
+        return name
     finally:
         kernel32.CloseHandle(ph)
 
