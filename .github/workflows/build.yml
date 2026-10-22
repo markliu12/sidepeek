@@ -34,6 +34,22 @@ jobs:
           if ($info.ProductName -ne "SidePeek") { throw "version resource missing" }
           if ($exe.Length -lt 1MB) { throw "unexpectedly small executable" }
 
+      - name: Smoke test the executable
+        shell: pwsh
+        run: |
+          # The runner has no interactive desktop, so the full self-test would
+          # find no game window to capture; --list still boots the exe, runs the
+          # Python logic and enumerates windows, which catches a broken build
+          # (a missing import, a bad ctypes binding, ...) early.
+          #
+          # Start-Process -Wait -PassThru instead of invoking the exe directly:
+          # a GUI-subsystem executable does not populate $LASTEXITCODE in a
+          # synchronous pwsh call, so the exit code has to come from the
+          # process object.
+          $p = Start-Process -FilePath "dist/SidePeek.exe" -ArgumentList "--list" -NoNewWindow -Wait -PassThru
+          "exit code: $($p.ExitCode)"
+          if ($p.ExitCode -ne 0) { throw "SidePeek.exe --list exited with $($p.ExitCode)" }
+
       - uses: actions/upload-artifact@v4
         with:
           name: SidePeek-windows-x64

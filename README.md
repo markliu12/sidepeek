@@ -248,9 +248,10 @@ This backend requires the source window to be composed by the Desktop Window Man
 ```bash
 python -m compileall -q sidepeek run.py
 python -m unittest discover -s tests -t .
+python -m mypy            # type check (requires mypy)
 ```
 
-The test suite uses the standard library `unittest` module and requires no additional packages. The Win32 layer is mocked, so the tests run without an interactive desktop session. Continuous integration executes the suite on Python 3.9, 3.11 and 3.13.
+The test suite uses the standard library `unittest` module and requires no additional packages. The Win32 layer is mocked, so the tests run without an interactive desktop session. Continuous integration executes the suite on Python 3.9, 3.11 and 3.13, and runs a `mypy` type check as a separate job.
 
 ## Limitations
 

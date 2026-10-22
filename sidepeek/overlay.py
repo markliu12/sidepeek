@@ -23,6 +23,7 @@ import os
 import sys
 import time
 import traceback
+from typing import Any, Callable
 
 from . import win32
 from .capture import WindowCapture
@@ -112,7 +113,7 @@ class Overlay:
 
     _class_registered = False
     _instances: dict[int, "Overlay"] = {}
-    _wndproc_ref = None
+    _wndproc_ref: Any = None
 
     def __init__(self, settings: Settings, config_path: str) -> None:
         self.settings = settings
@@ -123,7 +124,7 @@ class Overlay:
         self.mode = ""
         self.target: Target | None = None
         self.source_size = (0, 0)
-        self.thumb = None
+        self.thumb: ctypes.c_void_p | None = None
         self.capture: WindowCapture | None = None
         self.fallback_reason = ""
 
@@ -134,8 +135,8 @@ class Overlay:
         self.on_lock = lambda: None
         self.on_select_target = lambda target: None
         self.on_toggle_autostart = lambda: None
-        self.candidates_provider = lambda: []
-        self.autostart_provider = lambda: False
+        self.candidates_provider: Callable[[], list[Target]] = lambda: []
+        self.autostart_provider: Callable[[], bool] = lambda: False
         self._locked_target: Target | None = None
         self._menu_choices: dict[int, Target | None] = {}
 
