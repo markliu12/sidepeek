@@ -854,7 +854,10 @@ class Overlay:
             return
         if self.capture.grab():
             self.source_size = (self.capture.width, self.capture.height)
-        user32.InvalidateRect(self.hwnd, None, False)
+        # Only the picture area changed; the caption strip has its own 1s timer
+        # and must not be repainted (let alone the whole window) at frame rate.
+        rect = win32.wt.RECT(*self._content_box())
+        user32.InvalidateRect(self.hwnd, ctypes.byref(rect), False)
 
     def _start_caption_timer(self) -> None:
         """Tick the "in background for 0:42" label.
