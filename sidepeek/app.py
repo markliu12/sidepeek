@@ -18,7 +18,8 @@ from .capture import WindowCapture
 from .config import Settings
 from .cs2_rounds import CS2RoundMonitor, WindowsToast
 from .diag import install_excepthook, log, log_path
-from .overlay import CLASS_NAME, Overlay
+from .notices import coerce as coerce_language
+from .overlay import CLASS_NAME, LANGUAGE_LABELS, Overlay
 from .png import write_png
 from .watcher import Target, Watcher, covers_monitor, describe
 
@@ -107,8 +108,10 @@ class App:
         self.overlay.on_toggle_cs2_rounds = self.toggle_cs2_rounds
         self.overlay.on_test_bark = self.test_bark
         self.overlay.on_configure_bark = self.configure_bark
+        self.overlay.on_set_language = self.set_notification_language
         self.overlay.candidates_provider = self.watcher.candidates
         self.overlay.autostart_provider = autostart.is_enabled
+        self.overlay.language_provider = lambda: self.settings.notification_language
 
         if self.settings.cs2_round_notifications:
             self._start_cs2_monitor()
@@ -363,6 +366,23 @@ class App:
             self.cs2_monitor.stop()
             self.cs2_monitor = None
             log("CS2 round notifications: disabled")
+
+    def set_notification_language(self, value: str) -> None:
+        """Persist the round-notification language picked from the tray menu.
+
+        The monitor reads the setting through ``language_provider`` on every
+        round, so this takes effect immediately - no restart, and the next
+        banner already uses the new language.
+        """
+        language = coerce_language(value)
+        if language == self.settings.notification_language:
+            return
+        self.settings.notification_language = language
+        config_mod.save_runtime(self.config_path, self.settings, skip=self.cli_overrides)
+        log(f"notification language: {language}")
+        self.overlay.notify(
+            "SidePeek", f"回合提醒语言：{LANGUAGE_LABELS.get(language, language)}"
+        )
         config_mod.save_runtime(self.config_path, self.settings)
 
     def quit(self) -> None:

@@ -17,6 +17,9 @@ All notable changes to this project are documented in this file. The format foll
   pins one language; locale spellings such as `en-US` or `zh-Hant` are accepted.
   Verdicts that come from the colour fallback carry no text, so they use the OCR
   engine's own language, or the pinned one.
+- **The language is also a tray-menu entry.** Right-click the tray icon ->
+  `提醒语言` -> `自动（跟随游戏语言）` / `简体中文` / `繁體中文` / `English`. The
+  choice is saved to `config.json` and applies to the next round; no restart.
 
 ## [0.5.1] - 2026-10-23
 

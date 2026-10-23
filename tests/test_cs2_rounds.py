@@ -1,6 +1,9 @@
 """CS2 round-result OCR matching and notification de-duplication."""
 
+import json
+import os
 import struct
+import tempfile
 import unittest
 from types import SimpleNamespace
 from unittest import mock
@@ -281,6 +284,37 @@ class NoticeLanguageTest(unittest.TestCase):
             for result in ("win", "loss"):
                 title, message = ROUND_NOTICES[language][result]
                 self.assertTrue(title and message, (language, result))
+
+
+class LanguageMenuActionTest(unittest.TestCase):
+    """Picking a language in the tray menu must persist and apply at once."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.path = os.path.join(tmp.name, "config.json")
+        self.app = App.__new__(App)
+        self.app.settings = Settings(notification_language="auto")
+        self.app.config_path = self.path
+        self.app.cli_overrides = ()
+        self.app.overlay = SimpleNamespace(notify=mock.Mock(return_value=True))
+
+    def test_switches_and_persists_without_a_restart(self):
+        self.app.set_notification_language("zh-TW")
+        self.assertEqual(self.app.settings.notification_language, "zh-TW")
+        with open(self.path, encoding="utf-8") as fh:
+            self.assertEqual(json.load(fh)["peek"]["notification_language"], "zh-TW")
+        self.app.overlay.notify.assert_called_once()
+
+    def test_choosing_the_current_value_changes_nothing(self):
+        self.app.set_notification_language("auto")
+        self.app.overlay.notify.assert_not_called()
+        self.assertFalse(os.path.exists(self.path))
+
+    def test_unknown_value_lands_on_auto(self):
+        self.app.settings.notification_language = "en"
+        self.app.set_notification_language("klingon")
+        self.assertEqual(self.app.settings.notification_language, "auto")
 
 
 if __name__ == "__main__":

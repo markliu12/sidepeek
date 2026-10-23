@@ -62,6 +62,26 @@ TRAY_MENU_AUTOSTART = 2005
 TRAY_MENU_CS2_ROUNDS = 2006
 TRAY_MENU_TEST_BARK = 2007
 TRAY_MENU_BARK_SETTINGS = 2008
+TRAY_MENU_LANGUAGE_AUTO = 2010
+TRAY_MENU_LANGUAGE_ZH_CN = 2011
+TRAY_MENU_LANGUAGE_ZH_TW = 2012
+TRAY_MENU_LANGUAGE_EN = 2013
+
+#: notification language the menu can select, in display order
+TRAY_MENU_LANGUAGES = {
+    TRAY_MENU_LANGUAGE_AUTO: "auto",
+    TRAY_MENU_LANGUAGE_ZH_CN: "zh-CN",
+    TRAY_MENU_LANGUAGE_ZH_TW: "zh-TW",
+    TRAY_MENU_LANGUAGE_EN: "en",
+}
+
+#: menu label per language value; also used for the confirmation balloon
+LANGUAGE_LABELS = {
+    "auto": "自动（跟随游戏语言）",
+    "zh-CN": "简体中文",
+    "zh-TW": "繁體中文",
+    "en": "English",
+}
 
 # target picker, shared by the notification area menu and the thumbnail menu
 MENU_TARGET_AUTO = 2100
@@ -141,8 +161,10 @@ class Overlay:
         self.on_toggle_cs2_rounds = lambda: None
         self.on_test_bark = lambda: None
         self.on_configure_bark = lambda: None
+        self.on_set_language = lambda value: None
         self.candidates_provider: Callable[[], list[Target]] = lambda: []
         self.autostart_provider: Callable[[], bool] = lambda: False
+        self.language_provider: Callable[[], str] = lambda: "auto"
         self._locked_target: Target | None = None
         self._menu_choices: dict[int, Target | None] = {}
 
@@ -354,6 +376,25 @@ class Overlay:
 
         user32.AppendMenuW(parent, win32.MF_POPUP, submenu, "监视窗口")
 
+    def _append_language_menu(self, parent) -> None:
+        """Append the "提醒语言" submenu.
+
+        "自动" follows the language of the round banner, which is what the
+        player actually read on screen. The explicit entries are for OCR that
+        keeps guessing the wrong script, and for anyone who just wants a fixed
+        language regardless of the client.
+        """
+        submenu = user32.CreatePopupMenu()
+        if not submenu:
+            return
+        current = self.language_provider()
+        for command, value in TRAY_MENU_LANGUAGES.items():
+            flags = win32.MF_STRING | win32.MF_RADIOCHECK
+            if value == current:
+                flags |= win32.MF_CHECKED
+            user32.AppendMenuW(submenu, flags, command, LANGUAGE_LABELS[value])
+        user32.AppendMenuW(parent, win32.MF_POPUP, submenu, "提醒语言")
+
     def _append_view_menu(self, parent) -> None:
         """Add the "fit to the picture" toggle.
 
@@ -399,6 +440,7 @@ class Overlay:
                 menu, rounds_flags, TRAY_MENU_CS2_ROUNDS,
                 "CS2 回合结束提醒",
             )
+            self._append_language_menu(menu)
             user32.AppendMenuW(
                 menu, win32.MF_STRING, TRAY_MENU_BARK_SETTINGS,
                 "手机提醒设置...",
@@ -450,6 +492,8 @@ class Overlay:
             self.on_toggle_autostart()
         elif cmd == TRAY_MENU_CS2_ROUNDS:
             self.on_toggle_cs2_rounds()
+        elif cmd in TRAY_MENU_LANGUAGES:
+            self.on_set_language(TRAY_MENU_LANGUAGES[cmd])
         elif cmd == TRAY_MENU_TEST_BARK:
             self.on_test_bark()
         elif cmd == TRAY_MENU_BARK_SETTINGS:
