@@ -271,6 +271,13 @@ class App:
         except Exception as exc:
             self.cs2_monitor = None
             log(f"CS2 round notifications could not initialize: {exc}")
+            # the tray check mark would otherwise claim a feature that is not
+            # running, and the packaged build has nowhere else to say so
+            self.overlay.notify(
+                "SidePeek",
+                f"CS2 回合提醒未能启用：{exc}",
+                warning=True,
+            )
 
     def _cs2_round_target(self) -> int:
         if self.watcher.paused or not self.settings.cs2_round_notifications:
@@ -296,6 +303,9 @@ class App:
         self.settings.cs2_round_notifications = not self.settings.cs2_round_notifications
         if self.settings.cs2_round_notifications:
             self._start_cs2_monitor()
+            if self.cs2_monitor is None:
+                # keep the tray check mark honest: nothing is sampling now
+                self.settings.cs2_round_notifications = False
         elif self.cs2_monitor:
             self.cs2_monitor.stop()
             self.cs2_monitor = None
