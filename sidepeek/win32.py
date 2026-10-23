@@ -191,6 +191,8 @@ LR_DEFAULTSIZE = 0x0040
 IDI_APPLICATION = 32512
 MF_CHECKED = 0x00000008
 MF_GRAYED = 0x00000001
+# draws a radio bullet instead of a checkmark, for mutually exclusive entries
+MF_RADIOCHECK = 0x00000200
 
 
 # --------------------------------------------------------------------------

@@ -11,6 +11,10 @@ from sidepeek.overlay import (
     TRAY_MENU_ACTIVATE,
     TRAY_MENU_AUTOSTART,
     TRAY_MENU_CS2_ROUNDS,
+    TRAY_MENU_LANGUAGE_AUTO,
+    TRAY_MENU_LANGUAGE_EN,
+    TRAY_MENU_LANGUAGE_ZH_CN,
+    TRAY_MENU_LANGUAGE_ZH_TW,
     TRAY_MENU_QUIT,
     TRAY_MENU_TOGGLE,
     MENU_TARGET_AUTO,
@@ -159,6 +163,19 @@ class TrayTest(unittest.TestCase):
         overlay.on_toggle_cs2_rounds = lambda: called.append("cs2-rounds")
         overlay._on_tray_command(TRAY_MENU_CS2_ROUNDS)
         self.assertEqual(called, ["cs2-rounds"])
+
+    def test_language_commands_map_to_their_values(self):
+        overlay = make_overlay()
+        picked = []
+        overlay.on_set_language = picked.append
+        for command in (TRAY_MENU_LANGUAGE_ZH_CN, TRAY_MENU_LANGUAGE_ZH_TW,
+                        TRAY_MENU_LANGUAGE_EN, TRAY_MENU_LANGUAGE_AUTO):
+            overlay._on_tray_command(command)
+        self.assertEqual(picked, ["zh-CN", "zh-TW", "en", "auto"])
+
+    def test_language_provider_defaults_to_auto(self):
+        # the tray submenu must have something to put the radio mark on
+        self.assertEqual(make_overlay().language_provider(), "auto")
 
     def test_notify_without_a_tray_icon_does_nothing(self):
         # nothing to attach a balloon to, and it must not raise
