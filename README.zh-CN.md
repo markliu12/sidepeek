@@ -52,7 +52,7 @@ python run.py
 build_exe.bat
 ```
 
-产物为 `dist\SidePeek.exe`，约 8 MB，运行时不依赖 Python 环境。图标与 Windows 版本资源分别取自 `assets/sidepeek.ico` 与 `version_info.txt`；若环境中缺少 PyInstaller，脚本会自动安装。首次启动时会在可执行文件同目录下生成 `config.json`。
+产物为 `dist\SidePeek.exe`，约 12 MB，运行时不依赖 Python 环境。图标与 Windows 版本资源分别取自 `assets/sidepeek.ico` 与 `version_info.txt`；若环境中缺少 PyInstaller，脚本会自动安装。首次启动时会在可执行文件同目录下生成 `config.json`。
 
 推送形如 `v*` 的标签会触发 `.github/workflows/build.yml`：构建可执行文件、校验版本资源是否存在，并同时作为工作流构件与发布附件上传。
 

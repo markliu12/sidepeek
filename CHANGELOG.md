@@ -6,6 +6,8 @@ All notable changes to this project are documented in this file. The format foll
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-23
+
 ### Added
 
 - Optional Bark phone notifications for detected CS2 round results, with a tray-menu test action.
@@ -20,8 +22,6 @@ All notable changes to this project are documented in this file. The format foll
 - **The language is also a tray-menu entry.** Right-click the tray icon ->
   `提醒语言` -> `自动（跟随游戏语言）` / `简体中文` / `繁體中文` / `English`. The
   choice is saved to `config.json` and applies to the next round; no restart.
-
-## [0.5.1] - 2026-10-23
 
 ### Changed
 
