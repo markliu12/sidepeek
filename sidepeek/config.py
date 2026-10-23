@@ -15,6 +15,11 @@ from dataclasses import dataclass
 
 from .diag import log
 
+DEFAULT_BARK_ICON_URL = (
+    "https://raw.githubusercontent.com/markliu12/sidepeek/main/"
+    "assets/sidepeek_icon_1024.png"
+)
+
 DEFAULTS: dict = {
     "peek": {
         # Window size in physical pixels. The default leaves a 480x270 (16:9)
@@ -78,6 +83,10 @@ DEFAULTS: dict = {
         "show_in_taskbar": False,
         # notify when CS2 shows the round-result banner while in background
         "cs2_round_notifications": True,
+        # optional Bark device key for forwarding CS2 round results to iPhone
+        "bark_device_key": "",
+        # public image URL shown as the Bark notification icon
+        "bark_icon_url": DEFAULT_BARK_ICON_URL,
     }
 }
 
@@ -107,6 +116,8 @@ class Settings:
     hotkey_quit: str = "ctrl+alt+q"
     show_in_taskbar: bool = False
     cs2_round_notifications: bool = True
+    bark_device_key: str = ""
+    bark_icon_url: str = DEFAULT_BARK_ICON_URL
 
 
 def app_dir() -> str:
@@ -173,6 +184,8 @@ def load(path: str | None = None) -> tuple[Settings, str]:
         hotkey_quit=str(p.get("hotkey_quit", "ctrl+alt+q")),
         show_in_taskbar=bool(p.get("show_in_taskbar", False)),
         cs2_round_notifications=bool(p.get("cs2_round_notifications", True)),
+        bark_device_key=str(p.get("bark_device_key", "")).strip(),
+        bark_icon_url=str(p.get("bark_icon_url", DEFAULT_BARK_ICON_URL)).strip(),
     )
     return settings, path
 
@@ -203,6 +216,10 @@ def save_runtime(
         peek["pos"] = list(settings.pos)
     if "cs2_round_notifications" not in skip:
         peek["cs2_round_notifications"] = settings.cs2_round_notifications
+    if "bark_device_key" not in skip:
+        peek["bark_device_key"] = settings.bark_device_key
+    if "bark_icon_url" not in skip:
+        peek["bark_icon_url"] = settings.bark_icon_url
     try:
         with open(path, "w", encoding="utf-8") as fh:
             json.dump(data, fh, indent=2, ensure_ascii=False)

@@ -5,10 +5,13 @@ from __future__ import annotations
 import argparse
 import ctypes
 import sys
+import threading
 from typing import Any
 
 from . import __version__
 from . import autostart, instance
+from . import bark
+from . import bark_settings
 from . import config as config_mod
 from . import win32
 from .capture import WindowCapture
@@ -102,6 +105,8 @@ class App:
         self.overlay.on_select_target = self.select_target
         self.overlay.on_toggle_autostart = self.toggle_autostart
         self.overlay.on_toggle_cs2_rounds = self.toggle_cs2_rounds
+        self.overlay.on_test_bark = self.test_bark
+        self.overlay.on_configure_bark = self.configure_bark
         self.overlay.candidates_provider = self.watcher.candidates
         self.overlay.autostart_provider = autostart.is_enabled
 
@@ -298,6 +303,52 @@ class App:
             log(f"CS2 Windows toast failed; falling back to tray notification: {exc}")
             if not self.overlay.notify(title, message):
                 log("CS2 tray notification fallback was unavailable")
+        if self.settings.bark_device_key:
+            self._send_bark_async(title, message)
+
+    def _send_bark_async(self, title: str, message: str, *, test: bool = False) -> None:
+        key = self.settings.bark_device_key
+        if not key:
+            if test:
+                self.overlay.notify("Bark 尚未配置", "请先在 config.json 中填写 bark_device_key。")
+            return
+
+        def send() -> None:
+            try:
+                bark.send_push(key, title, message, self.settings.bark_icon_url)
+                log("Bark push sent")
+                if test:
+                    self.overlay.notify("Bark 测试提醒已发送", "请检查手机是否收到 SidePeek 测试通知。")
+            except Exception as exc:
+                log(f"Bark push failed: {type(exc).__name__}: {exc}")
+                self.overlay.notify(
+                    "Bark 推送失败",
+                    "请检查网络与 Bark Key；详情见 sidepeek.log。",
+                    warning=True,
+                )
+
+        threading.Thread(target=send, name="SidePeek-Bark", daemon=True).start()
+
+    def test_bark(self) -> None:
+        if not self.settings.bark_device_key:
+            self.overlay.notify("Bark 尚未配置", "请先在 config.json 中填写 bark_device_key。")
+            return
+        self._send_bark_async(
+            "SidePeek 测试提醒",
+            "如果收到这条通知，Bark 已配置成功。",
+            test=True,
+        )
+
+    def configure_bark(self) -> None:
+        def save() -> None:
+            config_mod.save_runtime(
+                self.config_path, self.settings, skip=self.cli_overrides
+            )
+            log("Bark settings saved")
+
+        bark_settings.show_bark_settings(
+            self.overlay.hwnd, self.settings, save, self.test_bark
+        )
 
     def toggle_cs2_rounds(self) -> None:
         self.settings.cs2_round_notifications = not self.settings.cs2_round_notifications

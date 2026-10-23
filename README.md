@@ -108,6 +108,7 @@ SidePeek places an icon in the notification area for as long as it runs. It rema
 - **Double-click** pauses or resumes monitoring.
 - The tooltip reports the current state (`SidePeek — 监视中` or `SidePeek — 已暂停`).
 - **CS2 round-end notifications** are enabled by default. While CS2 is in the background, SidePeek checks the central result banner every half second and sends one Windows notification after recognizing `回合胜利` / `回合失敗` in either script. It rearms after the banner disappears, and a 10-second cooldown keeps a fading banner from notifying twice. Toggle the feature from the tray menu.
+- **Bark phone push** is optional. Copy the device key from Bark on your iPhone, open **手机提醒设置...** from the tray menu, paste the key, then choose **保存并测试**. Each detected CS2 result is then also sent to Bark. The key is stored in `config.json` next to SidePeek.exe; keep it private. Notifications use the SidePeek icon by default. To change it, edit `bark_icon_url` manually.
 
 If Explorer restarts, the icon is added again automatically.
 
@@ -207,7 +208,9 @@ The configuration file is JSON. Missing keys fall back to the defaults; unknown 
 | `hotkey_lock` | `"ctrl+alt+l"` | Locks the foreground window as the target. |
 | `hotkey_quit` | `"ctrl+alt+q"` | Terminates the program. |
 | `show_in_taskbar` | `false` | Displays the thumbnail in the taskbar. |
-| `cs2_round_notifications` | `true` | Sends one Windows notification when a CS2 round-result banner appears in the background. |
+| `cs2_round_notifications` | `true` | Sends one Windows notification when a CS2 round-result banner appears in the background; also sends a phone push when a Bark key is configured. |
+| `bark_device_key` | `""` | Device key from the Bark app. Empty disables phone pushes. |
+| `bark_icon_url` | SidePeek icon URL | Image URL for the Bark notification icon. Empty uses Bark's default icon. |
 
 Hotkeys may be changed or disabled by assigning an empty string. Changes take effect after a restart.
 

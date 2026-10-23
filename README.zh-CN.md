@@ -108,6 +108,7 @@ SidePeek 在运行期间于通知区域显示一个图标。缩略图隐藏时�
 - **双击**暂停或恢复监视。
 - 工具提示显示当前状态（`SidePeek — 监视中` 或 `SidePeek — 已暂停`）。
 - **CS2 回合结束提醒**默认开启。CS2 位于后台时，SidePeek 每半秒检查中央提示区域；连续识别到“回合胜利”或“回合失败”（简繁均可）后发送一次 Windows 通知。同一提示消失后会重新待命，且两次提醒之间至少有 10 秒冷却，避免横幅淡出时重复提醒。可在托盘菜单关闭此功能。
+- **Bark 手机推送**为可选功能。先在 iPhone 的 Bark App 中复制设备 Key，再从托盘菜单打开**手机提醒设置...**，粘贴 Key 后点**保存并测试**。配置后，每次 CS2 回合结果提醒也会推送到手机；通知默认使用 SidePeek 图标。Key 保存在 SidePeek.exe 同目录的 `config.json` 中，请勿分享。想更换通知图标可手动编辑 `bark_icon_url`。
 
 资源管理器重启后，图标会被自动重新添加。
 
@@ -207,7 +208,9 @@ result: ready - at least one backend works on this machine
 | `hotkey_lock` | `"ctrl+alt+l"` | 将前台窗口锁定为监视目标。 |
 | `hotkey_quit` | `"ctrl+alt+q"` | 退出程序。 |
 | `show_in_taskbar` | `false` | 在任务栏中显示缩略图窗口。 |
-| `cs2_round_notifications` | `true` | 在 CS2 后台回合结果出现时发送一次 Windows 通知。 |
+| `cs2_round_notifications` | `true` | 在 CS2 后台回合结果出现时发送一次 Windows 通知；配置 Bark Key 后也会推送到手机。 |
+| `bark_device_key` | `""` | Bark App 中的设备 Key。留空时不发送手机推送。 |
+| `bark_icon_url` | SidePeek 图标网址 | Bark 通知使用的图标图片网址；设为空使用 Bark 默认图标。 |
 
 热键可通过赋值为空字符串禁用。配置修改在程序重启后生效。
 
