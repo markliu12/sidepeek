@@ -119,5 +119,41 @@ class SaveRuntimeTest(unittest.TestCase):
         self.assertEqual(data["peek"]["width"], 500)
 
 
+class NotificationLanguageTest(unittest.TestCase):
+    """``notification_language`` accepts locale spellings but stores one value."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.path = os.path.join(tmp.name, "config.json")
+
+    def _load_with(self, value):
+        with open(self.path, "w", encoding="utf-8") as fh:
+            json.dump({"peek": {"notification_language": value}}, fh)
+        return _quiet_load(self.path)[0]
+
+    def test_defaults_to_auto(self):
+        settings, _ = _quiet_load(self.path)
+        self.assertEqual(settings.notification_language, "auto")
+
+    def test_accepts_supported_values(self):
+        for value in ("auto", "en", "zh-CN", "zh-TW"):
+            self.assertEqual(self._load_with(value).notification_language, value, value)
+
+    def test_locale_spellings_are_normalised(self):
+        self.assertEqual(self._load_with("en-US").notification_language, "en")
+        self.assertEqual(self._load_with("zh-Hant").notification_language, "zh-TW")
+        self.assertEqual(self._load_with("zh-Hans-CN").notification_language, "zh-CN")
+
+    def test_unknown_value_falls_back_to_auto(self):
+        self.assertEqual(self._load_with("esperanto").notification_language, "auto")
+        self.assertEqual(self._load_with(42).notification_language, "auto")
+
+    def test_persisted_at_runtime(self):
+        save_runtime(self.path, Settings(notification_language="en"))
+        with open(self.path, encoding="utf-8") as fh:
+            self.assertEqual(json.load(fh)["peek"]["notification_language"], "en")
+
+
 if __name__ == "__main__":
     unittest.main()

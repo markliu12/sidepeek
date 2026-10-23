@@ -16,6 +16,7 @@ from typing import Callable
 
 from .capture import WindowCapture
 from .diag import log
+from .notices import detect_language, resolve, round_notice
 
 POLL_SECONDS = 0.5
 PRESENT_FRAMES = 2
@@ -51,11 +52,6 @@ LOSS_CHARS = "失败敗负負输輸"
 # word boundary keeps stats columns ("ROUND LOSSES", "ROUND WINS") out.
 EN_ROUND_WIN = re.compile(r"round\s+(?:win|won)\b")
 EN_ROUND_LOSS = re.compile(r"round\s+(?:loss|lost)\b")
-ROUND_TITLES = {
-    "win": "CS2 回合胜利",
-    "loss": "CS2 回合失败",
-}
-ROUND_MESSAGE = "回合已结束，切回游戏准备下一回合。"
 
 # Fractions of the viewport that hold the round-result banner. The vertical
 # band is deliberately generous: the banner sits at a slightly different
@@ -422,9 +418,16 @@ class WindowsToast:
 class CS2RoundMonitor:
     """Background sampling loop. Provider returns an eligible CS2 HWND or 0."""
 
-    def __init__(self, target_provider: Callable[[], int], notify: Callable[[str, str], None]) -> None:
+    def __init__(
+        self,
+        target_provider: Callable[[], int],
+        notify: Callable[[str, str], None],
+        language_provider: Callable[[], str] | None = None,
+    ) -> None:
         self.target_provider = target_provider
         self.notify = notify
+        # "auto" follows the language of the banner itself; see notices.py.
+        self.language_provider = language_provider or (lambda: "auto")
         self.stop_event = threading.Event()
         self.thread = threading.Thread(target=self._run, name="SidePeek-CS2-OCR", daemon=True)
         self._started = False
@@ -495,9 +498,18 @@ class CS2RoundMonitor:
                             source = "colour"
                         event = state.observe(result)
                         if event:
-                            self.notify(ROUND_TITLES[event], ROUND_MESSAGE)
+                            # A colour-probe verdict carries no text, so it
+                            # cannot tell us the banner language; fall back to
+                            # what the OCR engine itself can read.
+                            language = resolve(
+                                self.language_provider(),
+                                detect_language(text),
+                                "zh-CN" if labels_readable else "en",
+                            )
+                            title, message = round_notice(event, language)
+                            self.notify(title, message)
                             seen = f" text={text[:24]!r}" if text else ""
-                            log(f"CS2 round result detected: {event} (via {source}){seen}")
+                            log(f"CS2 round result detected: {event} (via {source}, lang={language}){seen}")
                     else:
                         state.observe(None)
                 except Exception as exc:

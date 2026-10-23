@@ -18,6 +18,13 @@ from sidepeek.cs2_rounds import (
     crop_result_region,
 )
 from sidepeek.config import Settings
+from sidepeek.notices import (
+    LANGUAGES,
+    ROUND_NOTICES,
+    coerce,
+    detect_language,
+    round_notice,
+)
 from sidepeek.watcher import Target
 
 
@@ -225,6 +232,55 @@ class TargetGateTest(unittest.TestCase):
         self.app.overlay = SimpleNamespace(notify=mock.Mock(return_value=True))
         self.app._notify_cs2_round("CS2 回合勝利", "CS2 回合已结束。")
         self.app.overlay.notify.assert_called_once_with("CS2 回合勝利", "CS2 回合已结束。")
+
+
+class NoticeLanguageTest(unittest.TestCase):
+    """The toast/push copy follows the banner the player actually saw."""
+
+    def test_detects_script_from_the_banner_reading(self):
+        self.assertEqual(detect_language("回合失败"), "zh-CN")
+        self.assertEqual(detect_language("回合失敗"), "zh-TW")
+        self.assertEqual(detect_language("回合獲勝"), "zh-TW")
+        self.assertEqual(detect_language("ROUND WIN"), "en")
+        self.assertEqual(detect_language("Round\nLost"), "en")
+
+    def test_no_reading_means_no_guess(self):
+        self.assertIsNone(detect_language(None))
+        self.assertIsNone(detect_language(""))
+        self.assertIsNone(detect_language("1:30"))
+
+    def test_auto_follows_the_banner(self):
+        self.assertEqual(round_notice("win", "auto", "en")[0], "CS2 round won")
+        self.assertEqual(round_notice("loss", "auto", "en")[0], "CS2 round lost")
+        self.assertEqual(round_notice("win", "auto", "zh-TW")[0], "CS2 回合勝利")
+        self.assertEqual(round_notice("loss", "auto", "zh-CN")[0], "CS2 回合失败")
+
+    def test_auto_without_a_reading_uses_the_fallback(self):
+        # colour-probe verdicts carry no text at all
+        self.assertEqual(round_notice("win", "auto", None)[0], "CS2 回合胜利")
+        self.assertEqual(round_notice("win", "auto", None, "en")[0], "CS2 round won")
+        self.assertEqual(round_notice("loss", "auto", None, "en")[0], "CS2 round lost")
+
+    def test_explicit_language_ignores_detection(self):
+        self.assertEqual(round_notice("win", "en", "zh-TW")[0], "CS2 round won")
+        self.assertEqual(round_notice("loss", "zh-CN", "en")[0], "CS2 回合失败")
+        self.assertEqual(round_notice("win", "zh-TW", "zh-CN")[0], "CS2 回合勝利")
+
+    def test_config_spellings_are_tolerated(self):
+        self.assertEqual(coerce("AUTO"), "auto")
+        self.assertEqual(coerce("en-US"), "en")
+        self.assertEqual(coerce("zh-Hant"), "zh-TW")
+        self.assertEqual(coerce("zh-hans-cn"), "zh-CN")
+        self.assertEqual(coerce("klingon"), "auto")
+        self.assertEqual(coerce(None), "auto")
+
+    def test_every_language_covers_both_results(self):
+        for language in LANGUAGES:
+            if language == "auto":
+                continue
+            for result in ("win", "loss"):
+                title, message = ROUND_NOTICES[language][result]
+                self.assertTrue(title and message, (language, result))
 
 
 if __name__ == "__main__":

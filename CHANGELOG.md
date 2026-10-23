@@ -9,6 +9,14 @@ All notable changes to this project are documented in this file. The format foll
 ### Added
 
 - Optional Bark phone notifications for detected CS2 round results, with a tray-menu test action.
+- **Round-result wording follows the banner.** A simplified-Chinese client is
+  notified in simplified Chinese, a traditional one in traditional, and
+  `ROUND WIN` / `ROUND LOSS` in English, so the toast (and the Bark push) matches
+  what the player just read on screen instead of always being Chinese. The new
+  `notification_language` setting (`auto` by default, or `zh-CN` / `zh-TW` / `en`)
+  pins one language; locale spellings such as `en-US` or `zh-Hant` are accepted.
+  Verdicts that come from the colour fallback carry no text, so they use the OCR
+  engine's own language, or the pinned one.
 
 ## [0.5.1] - 2026-10-23
 

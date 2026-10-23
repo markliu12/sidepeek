@@ -14,6 +14,7 @@ import sys
 from dataclasses import dataclass
 
 from .diag import log
+from .notices import coerce as coerce_language
 
 DEFAULT_BARK_ICON_URL = (
     "https://raw.githubusercontent.com/markliu12/sidepeek/main/"
@@ -83,6 +84,8 @@ DEFAULTS: dict = {
         "show_in_taskbar": False,
         # notify when CS2 shows the round-result banner while in background
         "cs2_round_notifications": True,
+        # language of the round-result notification: auto follows the banner
+        "notification_language": "auto",
         # optional Bark device key for forwarding CS2 round results to iPhone
         "bark_device_key": "",
         # public image URL shown as the Bark notification icon
@@ -116,6 +119,7 @@ class Settings:
     hotkey_quit: str = "ctrl+alt+q"
     show_in_taskbar: bool = False
     cs2_round_notifications: bool = True
+    notification_language: str = "auto"
     bark_device_key: str = ""
     bark_icon_url: str = DEFAULT_BARK_ICON_URL
 
@@ -184,6 +188,7 @@ def load(path: str | None = None) -> tuple[Settings, str]:
         hotkey_quit=str(p.get("hotkey_quit", "ctrl+alt+q")),
         show_in_taskbar=bool(p.get("show_in_taskbar", False)),
         cs2_round_notifications=bool(p.get("cs2_round_notifications", True)),
+        notification_language=coerce_language(p.get("notification_language", "auto")),
         bark_device_key=str(p.get("bark_device_key", "")).strip(),
         bark_icon_url=str(p.get("bark_icon_url", DEFAULT_BARK_ICON_URL)).strip(),
     )
@@ -216,6 +221,8 @@ def save_runtime(
         peek["pos"] = list(settings.pos)
     if "cs2_round_notifications" not in skip:
         peek["cs2_round_notifications"] = settings.cs2_round_notifications
+    if "notification_language" not in skip:
+        peek["notification_language"] = settings.notification_language
     if "bark_device_key" not in skip:
         peek["bark_device_key"] = settings.bark_device_key
     if "bark_icon_url" not in skip:
