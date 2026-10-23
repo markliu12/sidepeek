@@ -42,6 +42,7 @@
     "hotkey_toggle": "ctrl+alt+g",
     "hotkey_lock": "ctrl+alt+l",
     "hotkey_quit": "ctrl+alt+q",
-    "show_in_taskbar": false
+    "show_in_taskbar": false,
+    "cs2_round_notifications": true
   }
 }

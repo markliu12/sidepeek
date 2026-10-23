@@ -8,6 +8,11 @@ All notable changes to this project are documented in this file. The format foll
 
 ### Added
 
+- **CS2 round-end notifications.** A background sampler recognizes the Chinese
+  round-result banner and sends one Windows app notification. It debounces the
+  result, waits for the banner to disappear before rearming, and falls back to
+  the banner's red/yellow colour when Windows OCR cannot read the stylized game
+  text. The tray menu can disable the feature.
 - **Type checking.** `mypy` runs over the source with a dedicated configuration
   (`mypy.ini`) and as a separate CI job, catching type errors in the `ctypes`
   layer before they ship.

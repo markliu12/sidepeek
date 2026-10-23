@@ -11,6 +11,9 @@ if errorlevel 1 (
     python -m pip install --upgrade pyinstaller || goto :err
 )
 
+echo [build] installing runtime dependencies...
+python -m pip install -r requirements.txt || goto :err
+
 echo [build] building...
 python -m PyInstaller ^
     --noconfirm ^

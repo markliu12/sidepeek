@@ -13,6 +13,7 @@ from . import config as config_mod
 from . import win32
 from .capture import WindowCapture
 from .config import Settings
+from .cs2_rounds import CS2RoundMonitor, WindowsToast
 from .diag import install_excepthook, log, log_path
 from .overlay import CLASS_NAME, Overlay
 from .png import write_png
@@ -83,6 +84,7 @@ class App:
         self._hook_ref: Any = None
         self._hotkeys: list[int] = []
         self._checking = False
+        self.cs2_monitor: CS2RoundMonitor | None = None
 
     # -- lifecycle ---------------------------------------------------------
     def run(self) -> int:
@@ -99,8 +101,12 @@ class App:
         self.overlay.on_lock = self.lock_foreground
         self.overlay.on_select_target = self.select_target
         self.overlay.on_toggle_autostart = self.toggle_autostart
+        self.overlay.on_toggle_cs2_rounds = self.toggle_cs2_rounds
         self.overlay.candidates_provider = self.watcher.candidates
         self.overlay.autostart_provider = autostart.is_enabled
+
+        if self.settings.cs2_round_notifications:
+            self._start_cs2_monitor()
 
         self._install_hook()
         self._register_hotkeys()
@@ -180,6 +186,9 @@ class App:
             )
 
     def _teardown(self) -> None:
+        if self.cs2_monitor:
+            self.cs2_monitor.stop()
+            self.cs2_monitor = None
         if self._hook:
             win32.user32.UnhookWinEvent(self._hook)
             self._hook = None
@@ -250,6 +259,48 @@ class App:
             "SidePeek",
             "下次登录 Windows 时将自动启动。" if after else "已取消开机自动启动。",
         )
+
+    def _start_cs2_monitor(self) -> None:
+        try:
+            WindowsToast()
+            self.cs2_monitor = CS2RoundMonitor(
+                self._cs2_round_target, self._notify_cs2_round
+            )
+            self.cs2_monitor.start()
+            log("CS2 round notifications: enabled")
+        except Exception as exc:
+            self.cs2_monitor = None
+            log(f"CS2 round notifications could not initialize: {exc}")
+
+    def _cs2_round_target(self) -> int:
+        if self.watcher.paused or not self.settings.cs2_round_notifications:
+            return 0
+        target = self.watcher.last_game
+        if not target or target.exe.lower() != "cs2.exe":
+            return 0
+        hwnd = target.hwnd
+        if (not win32.is_window(hwnd) or not win32.is_visible(hwnd)
+                or win32.is_minimized(hwnd) or win32.foreground() == hwnd):
+            return 0
+        return hwnd
+
+    def _notify_cs2_round(self, title: str, message: str) -> None:
+        try:
+            WindowsToast.show(title, message)
+        except Exception as exc:
+            log(f"CS2 Windows toast failed; falling back to tray notification: {exc}")
+            if not self.overlay.notify(title, message):
+                log("CS2 tray notification fallback was unavailable")
+
+    def toggle_cs2_rounds(self) -> None:
+        self.settings.cs2_round_notifications = not self.settings.cs2_round_notifications
+        if self.settings.cs2_round_notifications:
+            self._start_cs2_monitor()
+        elif self.cs2_monitor:
+            self.cs2_monitor.stop()
+            self.cs2_monitor = None
+            log("CS2 round notifications: disabled")
+        config_mod.save_runtime(self.config_path, self.settings)
 
     def quit(self) -> None:
         win32.user32.PostQuitMessage(0)
