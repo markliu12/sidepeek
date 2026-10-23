@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import ctypes
 import os
+import re
 import struct
 import sys
 import threading
@@ -36,16 +37,34 @@ ROUND_LABELS = {
     "回合落败": "loss",
     "回合落敗": "loss",
 }
+# Fallback for the stylised banner font: OCR often mangles exactly one glyph
+# ("回合失畋"), which defeats the exact table above. Once 回合 is anchored, a
+# single result character is enough - "反恐精英胜利" never contains 回合, so the
+# team line cannot leak in.
+ROUND_PREFIX = "回合"
+RESULT_FOLLOW_CHARS = 3
+WIN_CHARS = "胜利勝获獲赢贏"
+LOSS_CHARS = "失败敗负負输輸"
+# English clients render the same panel as "ROUND WIN" / "ROUND LOSS". Windows'
+# Chinese OCR engine reads Latin text correctly, so no second engine is needed.
+# The match runs on lowercased text with whitespace collapsed, and the trailing
+# word boundary keeps stats columns ("ROUND LOSSES", "ROUND WINS") out.
+EN_ROUND_WIN = re.compile(r"round\s+(?:win|won)\b")
+EN_ROUND_LOSS = re.compile(r"round\s+(?:loss|lost)\b")
 ROUND_TITLES = {
     "win": "CS2 回合胜利",
     "loss": "CS2 回合失败",
 }
 ROUND_MESSAGE = "回合已结束，切回游戏准备下一回合。"
 
-# Fractions of the viewport that hold the round-result banner. The OCR crop is
-# slightly wider than the colour probe; both trace back to the same banner.
-BANNER_BOX = (0.35, 0.14, 0.65, 0.28)
+# Fractions of the viewport that hold the round-result banner. The vertical
+# band is deliberately generous: the banner sits at a slightly different
+# relative height on 16:10 displays than on 16:9, and HUD scaling moves it too.
+BANNER_BOX = (0.32, 0.10, 0.68, 0.34)
 COLOR_BOX = (0.37, 0.15, 0.63, 0.27)
+# Upscale before OCR: Windows' engine is markedly better on larger glyphs, and
+# the crop is only a few hundred pixels wide.
+OCR_SCALE = 2
 # Share of the colour probe that a real banner has to cover, and how far it
 # has to out-vote the other banner colour.
 COVERAGE = 0.10
@@ -62,7 +81,37 @@ def classify_round_result(text: str) -> str | None:
     for phrase, result in ROUND_LABELS.items():
         if phrase in normalized:
             return result
+    latin = " ".join(text.split()).casefold()
+    if EN_ROUND_WIN.search(latin):
+        return "win"
+    if EN_ROUND_LOSS.search(latin):
+        return "loss"
+    index = normalized.find(ROUND_PREFIX)
+    while index != -1:
+        tail = normalized[index + len(ROUND_PREFIX):][:RESULT_FOLLOW_CHARS]
+        if any(ch in tail for ch in WIN_CHARS):
+            return "win"
+        if any(ch in tail for ch in LOSS_CHARS):
+            return "loss"
+        index = normalized.find(ROUND_PREFIX, index + 1)
     return None
+
+
+def colour_probe_allowed(labels_readable: bool, text: str | None) -> bool:
+    """Colour is a last resort, not a second opinion.
+
+    A round banner always carries a label, and warm map textures do not: the
+    CS2 main menu is a live render of a map, and an Inferno-style orange wall
+    cleared the red threshold mid-round. Both were reported as
+    `CS2 回合失败` with no round over, so colour is only consulted when OCR
+    cannot produce a verdict at all - because no engine that reads the banner's
+    script is installed (``labels_readable`` is false), or because OCR threw on
+    this frame. Whenever OCR can read the label, its answer is final, including
+    "this is not a round result".
+    """
+    if not labels_readable:
+        return True
+    return text is None
 
 
 class RoundResultState:
@@ -179,6 +228,10 @@ class WindowsOcr:
         self._Language = Language
         self._OcrEngine = OcrEngine
         self.engine = self._create_engine()
+        # A Latin-only engine reads "ROUND WIN" but cannot see 回合失败 at all,
+        # so that path has to fall back to the colour probe instead of reading
+        # an empty crop as "no banner".
+        self.reads_chinese = self.engine.recognizer_language.language_tag.lower().startswith("zh")
 
     def _create_engine(self):
         languages = []
@@ -208,7 +261,10 @@ class WindowsOcr:
         return engine
 
     async def recognize(self, bmp: bytes) -> str:
-        from winrt.windows.graphics.imaging import BitmapDecoder  # type: ignore[import-not-found]
+        from winrt.windows.graphics.imaging import (  # type: ignore[import-not-found]
+            BitmapAlphaMode, BitmapDecoder, BitmapPixelFormat, BitmapTransform,
+            ColorManagementMode, ExifOrientationMode,
+        )
         from winrt.windows.storage.streams import DataWriter, InMemoryRandomAccessStream  # type: ignore[import-not-found]
 
         stream = InMemoryRandomAccessStream()
@@ -218,7 +274,17 @@ class WindowsOcr:
         writer.detach_stream()
         stream.seek(0)
         decoder = await BitmapDecoder.create_async(stream)
-        bitmap = await decoder.get_software_bitmap_async()
+        width, height = struct.unpack_from("<ii", bmp, 18)
+        transform = BitmapTransform()
+        transform.scaled_width = width * OCR_SCALE
+        transform.scaled_height = height * OCR_SCALE
+        bitmap = await decoder.get_software_bitmap_transformed_async(
+            BitmapPixelFormat.BGRA8,
+            BitmapAlphaMode.IGNORE,
+            transform,
+            ExifOrientationMode.IGNORE_EXIF_ORIENTATION,
+            ColorManagementMode.DO_NOT_COLOR_MANAGE,
+        )
         result = await self.engine.recognize_async(bitmap)
         return "\n".join(line.text for line in result.lines)
 
@@ -390,6 +456,11 @@ class CS2RoundMonitor:
                 ocr = WindowsOcr()
             except Exception as exc:
                 log(f"CS2 round OCR unavailable; using banner colour fallback: {exc}")
+            # a Latin-only engine cannot see the Chinese labels, so it must not
+            # be allowed to veto the colour probe with an empty reading
+            labels_readable = bool(ocr and ocr.reads_chinese)
+            if ocr and not labels_readable:
+                log("CS2 OCR engine cannot read Chinese labels; colour fallback stays on")
 
             while not self.stop_event.is_set():
                 try:
@@ -408,22 +479,25 @@ class CS2RoundMonitor:
                         bmp, _, _ = crop_result_region(frame, capture.width, capture.height)
                         result = None
                         source = ""
+                        text: str | None = None
                         if bmp and ocr:
                             try:
-                                recognized = loop.run_until_complete(ocr.recognize(bmp))
-                                result = classify_round_result(recognized)
+                                text = loop.run_until_complete(ocr.recognize(bmp))
+                                result = classify_round_result(text)
                                 source = "ocr"
                             except Exception as exc:
+                                text = None
                                 if not ocr_failure_logged:
                                     log(f"CS2 OCR failed; using banner colour fallback: {exc}")
                                     ocr_failure_logged = True
-                        if result is None:
+                        if result is None and colour_probe_allowed(labels_readable, text):
                             result = classify_banner_color(frame, capture.width, capture.height)
                             source = "colour"
                         event = state.observe(result)
                         if event:
                             self.notify(ROUND_TITLES[event], ROUND_MESSAGE)
-                            log(f"CS2 round result detected: {event} (via {source})")
+                            seen = f" text={text[:24]!r}" if text else ""
+                            log(f"CS2 round result detected: {event} (via {source}){seen}")
                     else:
                         state.observe(None)
                 except Exception as exc:
