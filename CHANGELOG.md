@@ -4,7 +4,7 @@ All notable changes to this project are documented in this file. The format foll
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.5.1] - 2026-10-23
 
 ### Changed
 
@@ -203,7 +203,8 @@ All notable changes to this project are documented in this file. The format foll
 - Standalone Windows executable with an icon and a version resource.
 - Unit test suite and continuous integration on Python 3.9, 3.11 and 3.13.
 
-[Unreleased]: https://github.com/markliu12/sidepeek/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/markliu12/sidepeek/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/markliu12/sidepeek/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/markliu12/sidepeek/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/markliu12/sidepeek/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/markliu12/sidepeek/compare/v0.2.0...v0.3.0
