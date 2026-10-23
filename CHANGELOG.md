@@ -4,6 +4,46 @@ All notable changes to this project are documented in this file. The format foll
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] - 2026-10-23
+
+### Changed
+
+- **English banners are recognised too.** `ROUND WIN` / `ROUND LOSS` — any case,
+  plus the `won` / `lost` variants — now map onto the same results. The trailing
+  word boundary keeps scoreboard columns such as `ROUND LOSSES` and `Round Wins`
+  out. Verified end to end: Windows' `zh-Hans-CN` engine reads Latin text
+  perfectly, so no second OCR engine is created and nothing gets slower.
+- **A Latin-only OCR engine no longer silences Chinese clients.** If the machine
+  has `en-US` but no Chinese recogniser, an empty reading is not treated as
+  "no banner" any more — the colour probe stays enabled for that configuration.
+- **Recognition is more forgiving of OCR noise.** A round now counts when `回合`
+  is followed by any result character within three characters, so a label with
+  one mangled glyph (`回合失畋`) still resolves. The team line `反恐精英胜利` still
+  cannot match, because it never contains `回合`.
+- **The crop is upscaled 2x before OCR.** Measured on Chinese UI text: at a
+  24-32 px line height the 1x path returned nothing while the 2x path returned
+  readable text; from 48 px up both worked. Windows' engine is simply better on
+  larger glyphs, and the crop is only a few hundred pixels wide.
+- **The banner band is taller and wider** (y 10-34%, x 32-68%). 16:10 displays
+  place the banner at a different relative height than 16:9, and HUD scaling
+  moves it as well, so the band now leaves room instead of hugging the label.
+- Windows' `get_software_bitmap_transformed_async` needs its five positional
+  arguments in this projection order — `(pixel_format, alpha_mode, transform,
+  exif_orientation, color_management)`. Nothing else returns a scaled bitmap.
+
+### Fixed
+
+- **Round notifications fired while no round was over.** The colour probe ran
+  whenever OCR failed to *classify* the crop, including when OCR read nothing at
+  all. Two cases were reported in one evening: the CS2 main menu, which is a live
+  render of a map whose rusty red walls cleared the coverage threshold with the
+  game sitting idle, and an Inferno-style orange wall mid-round. A round banner
+  always carries a label and a map texture does not, so colour is now only
+  consulted when Windows OCR cannot produce a verdict at all - when no Chinese
+  OCR engine is installed, or when it throws on a frame. When OCR works, its
+  answer is final, including "this is not a round result". Detection log lines
+  now include the recognised text.
+
 ## [0.5.0] - 2026-10-23
 
 ### Added
@@ -163,7 +203,8 @@ All notable changes to this project are documented in this file. The format foll
 - Standalone Windows executable with an icon and a version resource.
 - Unit test suite and continuous integration on Python 3.9, 3.11 and 3.13.
 
-[Unreleased]: https://github.com/markliu12/sidepeek/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/markliu12/sidepeek/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/markliu12/sidepeek/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/markliu12/sidepeek/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/markliu12/sidepeek/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/markliu12/sidepeek/compare/v0.2.0...v0.3.0

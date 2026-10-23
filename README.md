@@ -111,7 +111,7 @@ SidePeek places an icon in the notification area for as long as it runs. It rema
 
 If Explorer restarts, the icon is added again automatically.
 
-When notifications are enabled, SidePeek ensures a per-user Start Menu shortcut exists so Windows can associate notifications with the app. Recognition uses Windows built-in OCR when Chinese OCR support is available, then falls back to detecting the result banner's red or yellow colour when OCR cannot read the game font. If frame capture is unavailable, SidePeek logs the reason and continues running; exclusive fullscreen is not guaranteed to be capturable.
+When notifications are enabled, SidePeek ensures a per-user Start Menu shortcut exists so Windows can associate notifications with the app. Recognition is text-first: the crop is upscaled 2x and read with Windows OCR, and a round counts when `回合` is followed by any result character — one misread glyph is tolerated, while the team line `反恐精英胜利` is not, since it never contains `回合`. Simplified, traditional and English clients are all covered (`ROUND WIN` / `ROUND LOSS`, any case). Any other reading, including none at all, means no round ended. The red/yellow colour check is kept only as a fallback for machines whose OCR cannot read the game's text at all, because the main menu and warm map walls are rendered scenes that colour alone cannot tell apart from a banner. If frame capture is unavailable, SidePeek logs the reason and continues running; exclusive fullscreen is not guaranteed to be capturable.
 
 ### One instance at a time
 

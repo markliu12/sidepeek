@@ -14,6 +14,7 @@ from sidepeek.cs2_rounds import (
     RoundResultState,
     classify_round_result,
     classify_banner_color,
+    colour_probe_allowed,
     crop_result_region,
 )
 from sidepeek.config import Settings
@@ -50,11 +51,39 @@ class ClassificationTest(unittest.TestCase):
         self.assertIsNone(classify_round_result("MVP 玩家擊殺"))
         self.assertIsNone(classify_round_result(""))
 
+    def test_one_mangled_glyph_still_classifies(self):
+        # Windows OCR misreads a single stroke of the stylised label more often
+        # than it misses the whole line, so 回合 + one result character is enough
+        self.assertEqual(classify_round_result("回合失畋"), "loss")
+        self.assertEqual(classify_round_result("回合滕利"), "win")
+        self.assertEqual(classify_round_result("回合\n胜利"), "win")
+
+    def test_team_line_and_neutral_text_stay_silent(self):
+        # "反恐精英胜利" announces the team, not your own round result
+        self.assertIsNone(classify_round_result("反恐精英胜利"))
+        self.assertIsNone(classify_round_result("恐怖分子獲勝"))
+        self.assertIsNone(classify_round_result("回合计时 1:30"))
+        self.assertIsNone(classify_round_result("回合"))
+
+    def test_english_labels(self):
+        # the English client shows the same panel as ROUND WIN / ROUND LOSS and
+        # Windows' Chinese OCR engine reads Latin text, so one engine suffices
+        self.assertEqual(classify_round_result("ROUND WIN"), "win")
+        self.assertEqual(classify_round_result("Round\nLoss"), "loss")
+        self.assertEqual(classify_round_result("round won"), "win")
+        self.assertEqual(classify_round_result("ROUND LOST"), "loss")
+
+    def test_english_stats_columns_stay_silent(self):
+        # "ROUND LOSSES" is a scoreboard column, not a round end
+        self.assertIsNone(classify_round_result("ROUND LOSSES"))
+        self.assertIsNone(classify_round_result("Round Wins"))
+        self.assertIsNone(classify_round_result("ROUND WINDOW"))
+
     def test_crops_center_region_to_bmp(self):
         width, height = 100, 100
         frame = bytes([0, 0, 0, 255]) * width * height
         bmp, crop_w, crop_h = crop_result_region(frame, width, height)
-        self.assertEqual((crop_w, crop_h), (30, 14))
+        self.assertEqual((crop_w, crop_h), (36, 24))
         self.assertEqual(bmp[:2], b"BM")
         self.assertEqual(struct.unpack_from("<ii", bmp, 18), (crop_w, crop_h))
 
@@ -82,6 +111,26 @@ class ClassificationTest(unittest.TestCase):
                 offset = (y * width + x) * 4
                 frame[offset:offset + 4] = bytes((20, 55, 220, 255))
         self.assertIsNone(classify_banner_color(frame, width, height))
+
+
+class ColourProbeGateTest(unittest.TestCase):
+    """A red crop is not a round end: OCR gets the final say."""
+
+    def test_warm_map_texture_cannot_override_ocr(self):
+        # an orange Inferno wall read as "round lost" mid-round; OCR saw the
+        # frame and found no result, and that verdict must stand
+        self.assertFalse(colour_probe_allowed(True, ""))
+        self.assertFalse(colour_probe_allowed(True, "  \n\t "))
+        self.assertFalse(colour_probe_allowed(True, "包点 A"))
+        self.assertFalse(colour_probe_allowed(True, "回合失败"))
+
+    def test_crop_word_is_not_required_when_ocr_is_missing(self):
+        # without a Chinese OCR engine, colour is the only channel there is
+        self.assertTrue(colour_probe_allowed(False, None))
+        self.assertTrue(colour_probe_allowed(False, ""))
+
+    def test_ocr_failure_keeps_the_fallback_alive(self):
+        self.assertTrue(colour_probe_allowed(True, None))
 
 
 class RoundResultStateTest(unittest.TestCase):
