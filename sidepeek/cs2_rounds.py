@@ -131,8 +131,8 @@ class WindowsOcr:
     """Windows.Media.Ocr wrapper; constructed lazily on its worker thread."""
 
     def __init__(self) -> None:
-        from winrt.windows.globalization import Language
-        from winrt.windows.media.ocr import OcrEngine
+        from winrt.windows.globalization import Language  # type: ignore[import-not-found]
+        from winrt.windows.media.ocr import OcrEngine  # type: ignore[import-not-found]
         self._Language = Language
         self._OcrEngine = OcrEngine
         self.engine = self._create_engine()
@@ -165,8 +165,8 @@ class WindowsOcr:
         return engine
 
     async def recognize(self, bmp: bytes) -> str:
-        from winrt.windows.graphics.imaging import BitmapDecoder
-        from winrt.windows.storage.streams import DataWriter, InMemoryRandomAccessStream
+        from winrt.windows.graphics.imaging import BitmapDecoder  # type: ignore[import-not-found]
+        from winrt.windows.storage.streams import DataWriter, InMemoryRandomAccessStream  # type: ignore[import-not-found]
 
         stream = InMemoryRandomAccessStream()
         writer = DataWriter(stream.get_output_stream_at(0))
@@ -279,8 +279,8 @@ class WindowsToast:
 
     @staticmethod
     def show(title: str, message: str) -> None:
-        from winrt.windows.data.xml.dom import XmlDocument
-        from winrt.windows.ui.notifications import ToastNotification, ToastNotificationManager
+        from winrt.windows.data.xml.dom import XmlDocument  # type: ignore[import-not-found]
+        from winrt.windows.ui.notifications import ToastNotification, ToastNotificationManager  # type: ignore[import-not-found]
 
         xml = XmlDocument()
         safe_title = title.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
