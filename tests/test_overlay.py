@@ -10,6 +10,7 @@ from sidepeek.overlay import (
     MENU_FIT,
     TRAY_MENU_ACTIVATE,
     TRAY_MENU_AUTOSTART,
+    TRAY_MENU_CS2_ROUNDS,
     TRAY_MENU_QUIT,
     TRAY_MENU_TOGGLE,
     MENU_TARGET_AUTO,
@@ -151,6 +152,13 @@ class TrayTest(unittest.TestCase):
         overlay.on_toggle_autostart = lambda: called.append("autostart")
         overlay._on_tray_command(TRAY_MENU_AUTOSTART)
         self.assertEqual(called, ["autostart"])
+
+    def test_cs2_round_command_reaches_the_callback(self):
+        overlay = make_overlay()
+        called = []
+        overlay.on_toggle_cs2_rounds = lambda: called.append("cs2-rounds")
+        overlay._on_tray_command(TRAY_MENU_CS2_ROUNDS)
+        self.assertEqual(called, ["cs2-rounds"])
 
     def test_notify_without_a_tray_icon_does_nothing(self):
         # nothing to attach a balloon to, and it must not raise

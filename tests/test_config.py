@@ -42,6 +42,7 @@ class LoadTest(unittest.TestCase):
         self.assertEqual(settings.width, 600)
         self.assertEqual(settings.height, 304)          # untouched default
         self.assertEqual(settings.backend, "auto")
+        self.assertTrue(settings.cs2_round_notifications)
 
     def test_unknown_keys_are_ignored(self):
         self._write({"peek": {"width": 320, "totally_new_option": True}, "extra": 1})
@@ -77,6 +78,13 @@ class SaveRuntimeTest(unittest.TestCase):
         self.addCleanup(tmp.cleanup)
         self.path = os.path.join(tmp.name, "config.json")
         _quiet_load(self.path)
+
+    def test_cs2_round_notification_toggle_persists(self):
+        settings, _ = _quiet_load(self.path)
+        settings.cs2_round_notifications = False
+        save_runtime(self.path, settings)
+        with open(self.path, encoding="utf-8") as fh:
+            self.assertFalse(json.load(fh)["peek"]["cs2_round_notifications"])
 
     def _read(self):
         with open(self.path, encoding="utf-8") as fh:

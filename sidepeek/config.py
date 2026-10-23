@@ -76,6 +76,8 @@ DEFAULTS: dict = {
         "hotkey_lock": "ctrl+alt+l",
         "hotkey_quit": "ctrl+alt+q",
         "show_in_taskbar": False,
+        # notify when CS2 shows the round-result banner while in background
+        "cs2_round_notifications": True,
     }
 }
 
@@ -104,6 +106,7 @@ class Settings:
     hotkey_lock: str = "ctrl+alt+l"
     hotkey_quit: str = "ctrl+alt+q"
     show_in_taskbar: bool = False
+    cs2_round_notifications: bool = True
 
 
 def app_dir() -> str:
@@ -169,6 +172,7 @@ def load(path: str | None = None) -> tuple[Settings, str]:
         hotkey_lock=str(p.get("hotkey_lock", "ctrl+alt+l")),
         hotkey_quit=str(p.get("hotkey_quit", "ctrl+alt+q")),
         show_in_taskbar=bool(p.get("show_in_taskbar", False)),
+        cs2_round_notifications=bool(p.get("cs2_round_notifications", True)),
     )
     return settings, path
 
@@ -197,6 +201,8 @@ def save_runtime(
     if "anchor" not in skip:
         peek["anchor"] = settings.anchor
         peek["pos"] = list(settings.pos)
+    if "cs2_round_notifications" not in skip:
+        peek["cs2_round_notifications"] = settings.cs2_round_notifications
     try:
         with open(path, "w", encoding="utf-8") as fh:
             json.dump(data, fh, indent=2, ensure_ascii=False)

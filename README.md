@@ -26,7 +26,7 @@ The thumbnail is a live rendering of the game window rather than a periodic scre
 
 - Windows 10 or Windows 11, 64-bit
 - Python 3.9 or later, for execution from source
-- No third-party Python packages
+- WinRT Python projections for OCR and notifications (bundled in the executable)
 
 ## Installation
 
@@ -107,8 +107,11 @@ SidePeek places an icon in the notification area for as long as it runs. It rema
 - The **监视窗口** submenu lists every window that can be watched, largest first. Selecting one pins it, exactly like `Ctrl+Alt+L`; selecting **自动** releases the pin and returns to automatic detection. This is the intended way to switch between several running games: no hotkey to remember, and the list shows what is available.
 - **Double-click** pauses or resumes monitoring.
 - The tooltip reports the current state (`SidePeek — 监视中` or `SidePeek — 已暂停`).
+- **CS2 round-end notifications** are enabled by default. While CS2 is in the background, SidePeek checks the central result banner every half second and sends one Windows notification after recognizing `回合落敗` or `回合勝利`. It rearms after the banner disappears. Toggle the feature from the tray menu.
 
 If Explorer restarts, the icon is added again automatically.
+
+When notifications are enabled, SidePeek ensures a per-user Start Menu shortcut exists so Windows can associate notifications with the app. Recognition uses Windows built-in OCR when Chinese OCR support is available, then falls back to detecting the result banner's red or yellow colour when OCR cannot read the game font. If frame capture is unavailable, SidePeek logs the reason and continues running; exclusive fullscreen is not guaranteed to be capturable.
 
 ### One instance at a time
 
@@ -204,6 +207,7 @@ The configuration file is JSON. Missing keys fall back to the defaults; unknown 
 | `hotkey_lock` | `"ctrl+alt+l"` | Locks the foreground window as the target. |
 | `hotkey_quit` | `"ctrl+alt+q"` | Terminates the program. |
 | `show_in_taskbar` | `false` | Displays the thumbnail in the taskbar. |
+| `cs2_round_notifications` | `true` | Sends one Windows notification when a CS2 round-result banner appears in the background. |
 
 Hotkeys may be changed or disabled by assigning an empty string. Changes take effect after a restart.
 

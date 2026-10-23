@@ -59,6 +59,7 @@ TRAY_MENU_ACTIVATE = 2001
 TRAY_MENU_TOGGLE = 2003
 TRAY_MENU_QUIT = 2004
 TRAY_MENU_AUTOSTART = 2005
+TRAY_MENU_CS2_ROUNDS = 2006
 
 # target picker, shared by the notification area menu and the thumbnail menu
 MENU_TARGET_AUTO = 2100
@@ -135,6 +136,7 @@ class Overlay:
         self.on_lock = lambda: None
         self.on_select_target = lambda target: None
         self.on_toggle_autostart = lambda: None
+        self.on_toggle_cs2_rounds = lambda: None
         self.candidates_provider: Callable[[], list[Target]] = lambda: []
         self.autostart_provider: Callable[[], bool] = lambda: False
         self._locked_target: Target | None = None
@@ -386,6 +388,14 @@ class Overlay:
                 "恢复监视" if self._paused else "暂停监视",
             )
             user32.AppendMenuW(menu, win32.MF_SEPARATOR, 0, None)
+            rounds_flags = win32.MF_STRING | (
+                win32.MF_CHECKED if self.settings.cs2_round_notifications else 0
+            )
+            user32.AppendMenuW(
+                menu, rounds_flags, TRAY_MENU_CS2_ROUNDS,
+                "CS2 回合结束提醒",
+            )
+            user32.AppendMenuW(menu, win32.MF_SEPARATOR, 0, None)
             autostart_flags = win32.MF_STRING | (
                 win32.MF_CHECKED if self.autostart_provider() else 0
             )
@@ -423,6 +433,8 @@ class Overlay:
             self.on_toggle_pause()
         elif cmd == TRAY_MENU_AUTOSTART:
             self.on_toggle_autostart()
+        elif cmd == TRAY_MENU_CS2_ROUNDS:
+            self.on_toggle_cs2_rounds()
         elif cmd == MENU_FIT:
             self.toggle_fit_aspect()
         elif cmd == TRAY_MENU_QUIT:
