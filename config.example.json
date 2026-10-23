@@ -44,6 +44,7 @@
     "hotkey_quit": "ctrl+alt+q",
     "show_in_taskbar": false,
     "cs2_round_notifications": true,
+    "notification_language": "auto",
     "bark_device_key": "",
     "bark_icon_url": "https://raw.githubusercontent.com/markliu12/sidepeek/main/assets/sidepeek_icon_1024.png"
   }

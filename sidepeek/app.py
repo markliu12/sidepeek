@@ -269,7 +269,9 @@ class App:
         try:
             WindowsToast()
             self.cs2_monitor = CS2RoundMonitor(
-                self._cs2_round_target, self._notify_cs2_round
+                self._cs2_round_target,
+                self._notify_cs2_round,
+                language_provider=lambda: self.settings.notification_language,
             )
             self.cs2_monitor.start()
             log("CS2 round notifications: enabled")
