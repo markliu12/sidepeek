@@ -18,12 +18,38 @@ from .diag import log
 
 POLL_SECONDS = 0.5
 PRESENT_FRAMES = 2
-ABSENT_FRAMES = 3
+ABSENT_FRAMES = 4
+# A round cannot end twice in a row this fast, so a detection inside the
+# window is a banner fade artefact and must not produce a second toast.
+MIN_NOTIFY_INTERVAL = 10.0
 APP_ID = "MarkLiu.SidePeek"
-ROUND_TEXTS = {
-    "回合落敗": "CS2 回合落敗",
-    "回合勝利": "CS2 回合勝利",
+
+# CS2 both localises the banner and switches between simplified and
+# traditional Chinese depending on the client, and OCR may hand back either.
+ROUND_LABELS = {
+    "回合胜利": "win",
+    "回合勝利": "win",
+    "回合获胜": "win",
+    "回合獲勝": "win",
+    "回合失败": "loss",
+    "回合失敗": "loss",
+    "回合落败": "loss",
+    "回合落敗": "loss",
 }
+ROUND_TITLES = {
+    "win": "CS2 回合胜利",
+    "loss": "CS2 回合失败",
+}
+ROUND_MESSAGE = "回合已结束，切回游戏准备下一回合。"
+
+# Fractions of the viewport that hold the round-result banner. The OCR crop is
+# slightly wider than the colour probe; both trace back to the same banner.
+BANNER_BOX = (0.35, 0.14, 0.65, 0.28)
+COLOR_BOX = (0.37, 0.15, 0.63, 0.27)
+# Share of the colour probe that a real banner has to cover, and how far it
+# has to out-vote the other banner colour.
+COVERAGE = 0.10
+DOMINANCE = 2.5
 
 
 def normalize_ocr_text(text: str) -> str:
@@ -33,20 +59,28 @@ def normalize_ocr_text(text: str) -> str:
 
 def classify_round_result(text: str) -> str | None:
     normalized = normalize_ocr_text(text)
-    for phrase in ROUND_TEXTS:
+    for phrase, result in ROUND_LABELS.items():
         if phrase in normalized:
-            return phrase
+            return result
     return None
 
 
 class RoundResultState:
-    """Require stable positives and re-arm only after a stable absence."""
+    """Require stable positives, re-arm only after a stable absence.
 
-    def __init__(self) -> None:
+    ``observe`` returns ``"win"``/``"loss"`` exactly once per round end. Both
+    the latch and the cooldown exist because the banner fades in and out over
+    several seconds: frames around the fade dip below the detector's threshold,
+    which used to re-arm the latch and fire the same round twice.
+    """
+
+    def __init__(self, clock: Callable[[], float] = time.monotonic) -> None:
+        self._clock = clock
         self.candidate: str | None = None
         self.present_count = 0
         self.absent_count = 0
         self.latched = False
+        self.last_notified: float | None = None
 
     def observe(self, result: str | None) -> str | None:
         if result is None:
@@ -67,17 +101,22 @@ class RoundResultState:
         else:
             self.candidate = result
             self.present_count = 1
-        if self.present_count >= PRESENT_FRAMES:
-            self.latched = True
-            return result
-        return None
+        if self.present_count < PRESENT_FRAMES:
+            return None
+
+        self.latched = True
+        now = self._clock()
+        if self.last_notified is not None and now - self.last_notified < MIN_NOTIFY_INTERVAL:
+            return None
+        self.last_notified = now
+        return result
 
 
 def crop_result_region(bgra: bytes, width: int, height: int) -> tuple[bytes, int, int]:
     """Crop the central CS2 banner area and return a top-down 32-bit BMP."""
     # CS2 places the result card in the upper-middle portion of the viewport.
-    left, top = round(width * 0.35), round(height * 0.14)
-    right, bottom = round(width * 0.65), round(height * 0.28)
+    left, top = round(width * BANNER_BOX[0]), round(height * BANNER_BOX[1])
+    right, bottom = round(width * BANNER_BOX[2]), round(height * BANNER_BOX[3])
     crop_w, crop_h = right - left, bottom - top
     if width <= 0 or height <= 0 or len(bgra) < width * height * 4 or crop_w < 8 or crop_h < 8:
         return b"", 0, 0
@@ -97,13 +136,17 @@ def classify_banner_color(bgra: bytes, width: int, height: int) -> str | None:
     """Fallback for Chinese OCR engines that cannot read CS2's stylized font.
 
     CS2 uses a saturated red loss banner and a saturated golden-yellow win
-    banner. Only a central, banner-sized region is sampled; a result is
-    accepted only when the matching colour covers at least 2% of samples.
+    banner. The banner is a solid block, so the colour has to *fill* a fair
+    share of the sampled area - the old 2% threshold fired on blood spatter,
+    red map props and the kill feed, which is what produced three toasts for
+    one round.
     """
     if width < 8 or height < 8 or len(bgra) < width * height * 4:
         return None
-    left, top = round(width * 0.37), round(height * 0.15)
-    right, bottom = round(width * 0.63), round(height * 0.27)
+    left, top = round(width * COLOR_BOX[0]), round(height * COLOR_BOX[1])
+    right, bottom = round(width * COLOR_BOX[2]), round(height * COLOR_BOX[3])
+    if right - left < 8 or bottom - top < 8:
+        return None
     red = yellow = seen = 0
     # Subsample to keep capture analysis inexpensive at 4K resolutions.
     stride = max(1, width // 640)
@@ -120,10 +163,10 @@ def classify_banner_color(bgra: bytes, width: int, height: int) -> str | None:
                 yellow += 1
     if not seen:
         return None
-    if red / seen >= 0.02 and red > yellow * 1.5:
-        return "回合落敗"
-    if yellow / seen >= 0.02 and yellow > red * 1.5:
-        return "回合勝利"
+    if red / seen >= COVERAGE and red > yellow * DOMINANCE:
+        return "loss"
+    if yellow / seen >= COVERAGE and yellow > red * DOMINANCE:
+        return "win"
     return None
 
 
@@ -298,7 +341,16 @@ class WindowsToast:
         hr = set_app_id(APP_ID)
         if hr < 0:
             raise OSError(f"SetCurrentProcessExplicitAppUserModelID failed: 0x{hr & 0xffffffff:08x}")
-        ToastNotificationManager.create_toast_notifier().show(notification)
+        # The parameterless overload resolves the AUMID by matching the running
+        # process against a Start Menu shortcut and fails with ERROR_NOT_FOUND
+        # (0x80070490) for an unpackaged exe. Naming the AUMID explicitly is
+        # the documented path for desktop apps and works with the shortcut
+        # written by _ensure_shortcut.
+        try:
+            notifier = ToastNotificationManager.create_toast_notifier_with_id(APP_ID)
+        except Exception:
+            notifier = ToastNotificationManager.create_toast_notifier()
+        notifier.show(notification)
 
 
 class CS2RoundMonitor:
@@ -310,7 +362,6 @@ class CS2RoundMonitor:
         self.stop_event = threading.Event()
         self.thread = threading.Thread(target=self._run, name="SidePeek-CS2-OCR", daemon=True)
         self._started = False
-        self._failure_logged = False
 
     def start(self) -> None:
         if not self._started:
@@ -327,54 +378,66 @@ class CS2RoundMonitor:
         hwnd = 0
         state = RoundResultState()
         ocr: WindowsOcr | None = None
+        ocr_failure_logged = False
+        loop_failure_logged = False
+        # One loop for the lifetime of the thread: asyncio.run() built and tore
+        # down a loop twice a second, which is pure overhead and can abandon a
+        # WinRT operation that is still in flight.
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         try:
-            ocr = WindowsOcr()
-            self._failure_logged = False
-        except Exception as exc:
-            log(f"CS2 round OCR unavailable; using banner colour fallback: {exc}")
-            self._failure_logged = True
-
-        while not self.stop_event.is_set():
             try:
-                current = self.target_provider()
-                if current != hwnd:
-                    if capture:
-                        capture.release()
-                    capture = WindowCapture(current) if current else None
-                    hwnd = current
-                    state = RoundResultState()
-                if not current or not capture:
-                    self.stop_event.wait(POLL_SECONDS)
-                    continue
-                if capture.grab():
-                    frame = capture.pixel_bytes()
-                    bmp, _, _ = crop_result_region(frame, capture.width, capture.height)
-                    result = None
-                    if bmp:
-                        if ocr:
+                ocr = WindowsOcr()
+            except Exception as exc:
+                log(f"CS2 round OCR unavailable; using banner colour fallback: {exc}")
+
+            while not self.stop_event.is_set():
+                try:
+                    current = self.target_provider()
+                    if current != hwnd:
+                        if capture:
+                            capture.release()
+                        capture = WindowCapture(current) if current else None
+                        hwnd = current
+                        state = RoundResultState()
+                    if not current or not capture:
+                        self.stop_event.wait(POLL_SECONDS)
+                        continue
+                    if capture.grab():
+                        frame = capture.pixel_bytes()
+                        bmp, _, _ = crop_result_region(frame, capture.width, capture.height)
+                        result = None
+                        source = ""
+                        if bmp and ocr:
                             try:
-                                recognized = asyncio.run(ocr.recognize(bmp))
+                                recognized = loop.run_until_complete(ocr.recognize(bmp))
                                 result = classify_round_result(recognized)
+                                source = "ocr"
                             except Exception as exc:
-                                if not self._failure_logged:
+                                if not ocr_failure_logged:
                                     log(f"CS2 OCR failed; using banner colour fallback: {exc}")
-                                    self._failure_logged = True
+                                    ocr_failure_logged = True
                         if result is None:
                             result = classify_banner_color(frame, capture.width, capture.height)
+                            source = "colour"
                         event = state.observe(result)
                         if event:
-                            title = ROUND_TEXTS[event]
-                            self.notify(title, "CS2 回合已结束。")
-                            log(f"CS2 round result detected: {event}")
-                else:
-                    state.observe(None)
-            except Exception as exc:
-                if not self._failure_logged:
-                    log(f"CS2 round monitor error: {exc}")
-                    self._failure_logged = True
-            self.stop_event.wait(POLL_SECONDS)
-        if capture:
-            capture.release()
+                            self.notify(ROUND_TITLES[event], ROUND_MESSAGE)
+                            log(f"CS2 round result detected: {event} (via {source})")
+                    else:
+                        state.observe(None)
+                except Exception as exc:
+                    if not loop_failure_logged:
+                        log(f"CS2 round monitor error: {exc}")
+                        loop_failure_logged = True
+                self.stop_event.wait(POLL_SECONDS)
+        finally:
+            if capture:
+                capture.release()
+            try:
+                loop.close()
+            except Exception:
+                pass
 
 
 class GUID(ctypes.Structure):

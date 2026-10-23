@@ -107,7 +107,7 @@ SidePeek places an icon in the notification area for as long as it runs. It rema
 - The **监视窗口** submenu lists every window that can be watched, largest first. Selecting one pins it, exactly like `Ctrl+Alt+L`; selecting **自动** releases the pin and returns to automatic detection. This is the intended way to switch between several running games: no hotkey to remember, and the list shows what is available.
 - **Double-click** pauses or resumes monitoring.
 - The tooltip reports the current state (`SidePeek — 监视中` or `SidePeek — 已暂停`).
-- **CS2 round-end notifications** are enabled by default. While CS2 is in the background, SidePeek checks the central result banner every half second and sends one Windows notification after recognizing `回合落敗` or `回合勝利`. It rearms after the banner disappears. Toggle the feature from the tray menu.
+- **CS2 round-end notifications** are enabled by default. While CS2 is in the background, SidePeek checks the central result banner every half second and sends one Windows notification after recognizing `回合胜利` / `回合失敗` in either script. It rearms after the banner disappears, and a 10-second cooldown keeps a fading banner from notifying twice. Toggle the feature from the tray menu.
 
 If Explorer restarts, the icon is added again automatically.
 

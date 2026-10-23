@@ -9,6 +9,7 @@ from sidepeek import win32
 from sidepeek.app import App
 from sidepeek.cs2_rounds import (
     ABSENT_FRAMES,
+    MIN_NOTIFY_INTERVAL,
     PRESENT_FRAMES,
     RoundResultState,
     classify_round_result,
@@ -19,10 +20,31 @@ from sidepeek.config import Settings
 from sidepeek.watcher import Target
 
 
+class FakeClock:
+    """Monotonic clock the tests can advance by hand."""
+
+    def __init__(self) -> None:
+        self.now = 1000.0
+
+    def __call__(self) -> float:
+        return self.now
+
+    def advance(self, seconds: float) -> None:
+        self.now += seconds
+
+
 class ClassificationTest(unittest.TestCase):
     def test_matches_both_round_result_labels(self):
-        self.assertEqual(classify_round_result("回合落敗"), "回合落敗")
-        self.assertEqual(classify_round_result("回合\n勝利"), "回合勝利")
+        self.assertEqual(classify_round_result("回合落敗"), "loss")
+        self.assertEqual(classify_round_result("回合\n勝利"), "win")
+
+    def test_matches_simplified_and_traditional_variants(self):
+        # the client localises the banner, the OCR engine does not necessarily
+        # agree with it, so every variant has to land on the same result
+        for text in ("回合失败", "回合失敗", "回合落敗"):
+            self.assertEqual(classify_round_result(text), "loss", text)
+        for text in ("回合胜利", "回合勝利", "回合獲勝"):
+            self.assertEqual(classify_round_result(text), "win", text)
 
     def test_non_result_text_is_silent(self):
         self.assertIsNone(classify_round_result("MVP 玩家擊殺"))
@@ -43,42 +65,81 @@ class ClassificationTest(unittest.TestCase):
             for x in range(37, 63):
                 offset = (y * width + x) * 4
                 frame[offset:offset + 4] = bytes((20, 55, 220, 255))
-        self.assertEqual(classify_banner_color(frame, width, height), "回合落敗")
+        self.assertEqual(classify_banner_color(frame, width, height), "loss")
         for y in range(15, 27):
             for x in range(37, 63):
                 offset = (y * width + x) * 4
                 frame[offset:offset + 4] = bytes((20, 190, 240, 255))
-        self.assertEqual(classify_banner_color(frame, width, height), "回合勝利")
+        self.assertEqual(classify_banner_color(frame, width, height), "win")
         self.assertIsNone(classify_banner_color(bytes([0, 0, 0, 255]) * width * height, width, height))
+
+    def test_scattered_red_is_not_a_banner(self):
+        # blood, red props and kill-feed icons used to clear the old 2% bar
+        width = height = 100
+        frame = bytearray([0, 0, 0, 255] * width * height)
+        for y in range(15, 27, 3):
+            for x in range(37, 63, 9):
+                offset = (y * width + x) * 4
+                frame[offset:offset + 4] = bytes((20, 55, 220, 255))
+        self.assertIsNone(classify_banner_color(frame, width, height))
 
 
 class RoundResultStateTest(unittest.TestCase):
-    def test_requires_two_matching_frames_and_notifies_once(self):
-        state = RoundResultState()
-        self.assertIsNone(state.observe("回合勝利"))
-        self.assertEqual(state.observe("回合勝利"), "回合勝利")
-        for _ in range(PRESENT_FRAMES + 2):
-            self.assertIsNone(state.observe("回合勝利"))
+    def setUp(self):
+        self.clock = FakeClock()
+        self.state = RoundResultState(clock=self.clock)
 
-    def test_requires_three_absent_frames_to_rearm(self):
-        state = RoundResultState()
-        state.observe("回合落敗")
-        self.assertEqual(state.observe("回合落敗"), "回合落敗")
+    def test_requires_two_matching_frames_and_notifies_once(self):
+        self.assertIsNone(self.state.observe("win"))
+        self.assertEqual(self.state.observe("win"), "win")
+        for _ in range(PRESENT_FRAMES + 2):
+            self.assertIsNone(self.state.observe("win"))
+
+    def test_requires_absent_frames_to_rearm(self):
+        self.state.observe("loss")
+        self.assertEqual(self.state.observe("loss"), "loss")
         for _ in range(ABSENT_FRAMES - 1):
-            state.observe(None)
-            self.assertIsNone(state.observe("回合落敗"))
+            self.state.observe(None)
+            self.assertIsNone(self.state.observe("loss"))
             # A positive while latched cancels the absence sequence.
         for _ in range(ABSENT_FRAMES):
-            state.observe(None)
-        self.assertIsNone(state.observe("回合落敗"))
-        self.assertEqual(state.observe("回合落敗"), "回合落敗")
+            self.state.observe(None)
+        self.assertIsNone(self.state.observe("loss"))
+        self.clock.advance(MIN_NOTIFY_INTERVAL)
+        self.assertEqual(self.state.observe("loss"), "loss")
 
     def test_changed_result_requires_two_frames(self):
-        state = RoundResultState()
-        state.observe("回合勝利")
-        state.observe("回合勝利")
-        self.assertIsNone(state.observe("回合落敗"))
-        self.assertIsNone(state.observe("回合落敗"))  # still latched
+        self.state.observe("win")
+        self.state.observe("win")
+        self.assertIsNone(self.state.observe("loss"))
+        self.assertIsNone(self.state.observe("loss"))  # still latched
+
+    def test_flicker_inside_the_cooldown_stays_silent(self):
+        # the banner fades out, the latch re-arms, and the same round must not
+        # produce a second toast four seconds later
+        self.state.observe("win")
+        self.assertEqual(self.state.observe("win"), "win")
+        for _ in range(ABSENT_FRAMES):
+            self.state.observe(None)
+        self.clock.advance(4.0)
+        self.state.observe("win")
+        self.assertIsNone(self.state.observe("win"))
+        self.clock.advance(MIN_NOTIFY_INTERVAL)
+        for _ in range(ABSENT_FRAMES):
+            self.state.observe(None)
+        self.state.observe("loss")
+        self.assertEqual(self.state.observe("loss"), "loss")
+
+    def test_variant_flip_does_not_renotify(self):
+        # OCR can hand back simplified on one frame and traditional on the next
+        first = classify_round_result("回合胜利")
+        second = classify_round_result("回合勝利")
+        self.state.observe(first)
+        self.assertEqual(self.state.observe(first), "win")
+        for _ in range(ABSENT_FRAMES):
+            self.state.observe(None)
+        self.state.observe(second)
+        self.assertIsNone(self.state.observe(second))
 
 
 class TargetGateTest(unittest.TestCase):
