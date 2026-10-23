@@ -4,15 +4,16 @@ All notable changes to this project are documented in this file. The format foll
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.5.0] - 2026-10-23
 
 ### Added
 
-- **CS2 round-end notifications.** A background sampler recognizes the Chinese
-  round-result banner and sends one Windows app notification. It debounces the
-  result, waits for the banner to disappear before rearming, and falls back to
-  the banner's red/yellow colour when Windows OCR cannot read the stylized game
-  text. The tray menu can disable the feature.
+- **CS2 round-end notifications.** While CS2 sits in the background, a sampling
+  loop reads the round-result banner in the centre of the screen and sends one
+  Windows app notification per round — `CS2 回合胜利` or `CS2 回合失败`. Chinese
+  text is read with the built-in Windows OCR engine, with a red/yellow banner
+  colour probe as the fallback for stylized fonts, and both simplified and
+  traditional wording is recognized. The tray menu can turn the feature off.
 - **Type checking.** `mypy` runs over the source with a dedicated configuration
   (`mypy.ini`) and as a separate CI job, catching type errors in the `ctypes`
   layer before they ship.
@@ -32,6 +33,30 @@ All notable changes to this project are documented in this file. The format foll
   round-trip per window on every fallback enumeration, and the blank-frame
   sanity check reads the frame through a `memoryview` instead of a per-pixel
   Python loop.
+- **One asyncio loop for the round monitor** instead of building a new one twice
+  a second, and the "detected" log line now records whether OCR or the colour
+  probe produced the hit.
+
+### Fixed
+
+- **CS2 notifications never appeared as Windows toasts.** The parameterless
+  `ToastNotificationManager.CreateToastNotifier()` resolves the app id from a
+  Start Menu shortcut that matches the *running process* and fails with
+  `ERROR_NOT_FOUND (0x80070490)` for an unpackaged exe, so every round silently
+  degraded to a tray balloon. The app id is now passed explicitly
+  (`CreateToastNotifier(AUMID)`), which is the documented path for desktop apps.
+- **One round could notify three times.** The banner fades in and out over a few
+  seconds; frames around the fade dropped below the colour detector's threshold,
+  re-armed the latch and fired again 4-10 s later. A round-end cooldown
+  (`MIN_NOTIFY_INTERVAL`, 10 s) now swallows those repeats, and the latch needs a
+  longer stable absence before it re-arms.
+- **Colour fallback fired on blood and red map props.** The probe accepted 2% of
+  banner-coloured pixels inside a large box; a real banner fills a big block, so
+  the bar is now 10% coverage plus a 2.5x dominance margin over the other colour.
+- **Simplified Chinese banners were never matched.** Only `回合勝利` / `回合落敗`
+  were recognized, so a client running in simplified Chinese (whose OCR engine was
+  also selected as `zh-Hans-CN`) could only ever be detected by colour. Both
+  scripts, and the `回合失败` variant, now map onto one canonical result.
 
 ## [0.4.0] - 2026-10-21
 
@@ -138,7 +163,8 @@ All notable changes to this project are documented in this file. The format foll
 - Standalone Windows executable with an icon and a version resource.
 - Unit test suite and continuous integration on Python 3.9, 3.11 and 3.13.
 
-[Unreleased]: https://github.com/markliu12/sidepeek/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/markliu12/sidepeek/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/markliu12/sidepeek/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/markliu12/sidepeek/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/markliu12/sidepeek/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/markliu12/sidepeek/compare/v0.1.0...v0.2.0
