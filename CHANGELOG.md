@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file. The format foll
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Optional Bark phone notifications for detected CS2 round results, with a tray-menu test action.
+
 ## [0.5.1] - 2026-10-23
 
 ### Changed

@@ -43,6 +43,8 @@
     "hotkey_lock": "ctrl+alt+l",
     "hotkey_quit": "ctrl+alt+q",
     "show_in_taskbar": false,
-    "cs2_round_notifications": true
+    "cs2_round_notifications": true,
+    "bark_device_key": "",
+    "bark_icon_url": "https://raw.githubusercontent.com/markliu12/sidepeek/main/assets/sidepeek_icon_1024.png"
   }
 }

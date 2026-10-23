@@ -433,6 +433,14 @@ user32.EnumWindows.restype = wt.BOOL
 
 user32.GetWindowTextW.argtypes = [H, wt.LPWSTR, ctypes.c_int]
 user32.GetWindowTextW.restype = ctypes.c_int
+user32.SetWindowTextW.argtypes = [H, wt.LPCWSTR]
+user32.SetWindowTextW.restype = wt.BOOL
+user32.UpdateWindow.argtypes = [H]
+user32.UpdateWindow.restype = wt.BOOL
+user32.SetFocus.argtypes = [H]
+user32.SetFocus.restype = H
+user32.EnableWindow.argtypes = [H, wt.BOOL]
+user32.EnableWindow.restype = wt.BOOL
 
 user32.GetClassNameW.argtypes = [H, wt.LPWSTR, ctypes.c_int]
 user32.GetClassNameW.restype = ctypes.c_int

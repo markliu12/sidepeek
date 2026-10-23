@@ -60,6 +60,8 @@ TRAY_MENU_TOGGLE = 2003
 TRAY_MENU_QUIT = 2004
 TRAY_MENU_AUTOSTART = 2005
 TRAY_MENU_CS2_ROUNDS = 2006
+TRAY_MENU_TEST_BARK = 2007
+TRAY_MENU_BARK_SETTINGS = 2008
 
 # target picker, shared by the notification area menu and the thumbnail menu
 MENU_TARGET_AUTO = 2100
@@ -137,6 +139,8 @@ class Overlay:
         self.on_select_target = lambda target: None
         self.on_toggle_autostart = lambda: None
         self.on_toggle_cs2_rounds = lambda: None
+        self.on_test_bark = lambda: None
+        self.on_configure_bark = lambda: None
         self.candidates_provider: Callable[[], list[Target]] = lambda: []
         self.autostart_provider: Callable[[], bool] = lambda: False
         self._locked_target: Target | None = None
@@ -395,6 +399,17 @@ class Overlay:
                 menu, rounds_flags, TRAY_MENU_CS2_ROUNDS,
                 "CS2 回合结束提醒",
             )
+            user32.AppendMenuW(
+                menu, win32.MF_STRING, TRAY_MENU_BARK_SETTINGS,
+                "手机提醒设置...",
+            )
+            bark_flags = win32.MF_STRING | (
+                0 if self.settings.bark_device_key else win32.MF_GRAYED
+            )
+            user32.AppendMenuW(
+                menu, bark_flags, TRAY_MENU_TEST_BARK,
+                "测试 Bark 手机提醒",
+            )
             user32.AppendMenuW(menu, win32.MF_SEPARATOR, 0, None)
             autostart_flags = win32.MF_STRING | (
                 win32.MF_CHECKED if self.autostart_provider() else 0
@@ -435,6 +450,10 @@ class Overlay:
             self.on_toggle_autostart()
         elif cmd == TRAY_MENU_CS2_ROUNDS:
             self.on_toggle_cs2_rounds()
+        elif cmd == TRAY_MENU_TEST_BARK:
+            self.on_test_bark()
+        elif cmd == TRAY_MENU_BARK_SETTINGS:
+            self.on_configure_bark()
         elif cmd == MENU_FIT:
             self.toggle_fit_aspect()
         elif cmd == TRAY_MENU_QUIT:
